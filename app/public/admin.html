@@ -1,0 +1,24 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — admin</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <h1>Platform admin</h1>
+  <div class="row3" id="top"></div>
+  <h2>Revenue by engine</h2>
+  <div class="card"><div id="engines"></div></div>
+  <h2>Win-rate moat</h2>
+  <div class="card"><h3 style="margin-top:0;">By insurer</h3><div id="byInsurer"></div><h3>By denial reason</h3><div id="byReason"></div></div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['admin']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+(async()=>{ const d=await OT.api('/admin/metrics');
+  document.getElementById('top').innerHTML=[['Total revenue',OT.money(d.totalRevenue)],['Users',d.users],['Appeals',d.appeals],['Bill disputes',d.bills],['Orgs',d.orgs],['Overall win rate',d.winStats.overall+'%']].map(s=>`<div class="stat"><b>${s[1]}</b><span>${s[0]}</span></div>`).join('');
+  const e=d.revenueByEngine; const tot=d.totalRevenue||1;
+  document.getElementById('engines').innerHTML=[['Consumer (per-appeal + subs)',e.consumer],['Contingency (bill savings)',e.contingency],['B2B2C (pharma + provider + employer)',e.b2b2c]].map(x=>`<div style="margin:10px 0;"><div style="display:flex;justify-content:space-between;"><b>${x[0]}</b><span>${OT.money(x[1])}</span></div><div style="background:#eee;border-radius:6px;height:10px;margin-top:4px;"><div style="width:${Math.round(x[1]/tot*100)}%;background:var(--accent);height:10px;border-radius:6px;"></div></div></div>`).join('');
+  const tbl=(rows)=>'<table><tr><th>Key</th><th>Won/total</th><th>Win rate</th></tr>'+rows.map(r=>`<tr><td>${OT.esc(String(r.key).replace(/_/g,' '))}</td><td>${r.won}/${r.total}</td><td><b>${r.rate}%</b></td></tr>`).join('')+'</table>';
+  document.getElementById('byInsurer').innerHTML=tbl(d.winStats.byInsurer);
+  document.getElementById('byReason').innerHTML=tbl(d.winStats.byReason);
+})().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

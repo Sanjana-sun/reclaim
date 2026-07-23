@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — clinical review</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <div class="page-title"><h1 style="margin:0;">Clinical review queue</h1><span class="badge" id="count">0 pending</span></div>
+  <p class="muted" style="margin-top:0;">Confirm that medical-necessity appeals correctly reference the treating physician's evidence. This is a quality check — patients can still submit their own appeals.</p>
+  <div id="queue"></div>
+  <h2 style="margin-top:34px;">Recently reviewed</h2>
+  <div class="card" id="recent"><p class="muted">Loading…</p></div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['clinician']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+async function load(){
+  const {pending,recent}=await OT.api('/clinician/queue');
+  document.getElementById('count').textContent=pending.length+' pending';
+  const q=document.getElementById('queue');
+  q.innerHTML = pending.length ? pending.map(a=>`
+    <div class="card" style="margin-bottom:16px;">
+      <div class="page-title"><h3 style="margin:0;">${OT.esc(a.service||'Appeal')} ${a.drug?'· '+OT.esc(a.drug):''}</h3><span class="badge warn">${OT.esc(a.reason.replace(/_/g,' '))}</span></div>
+      <p class="muted" style="margin:4px 0 10px;">${OT.esc(a.insurer||'')} · ${OT.esc(a.plan_type)} · deadline ${new Date(a.deadline).toLocaleDateString()}</p>
+      <div class="letter" style="max-height:200px;">${OT.esc(a.letter)}</div>
+      <label>Reviewer note (optional)</label><textarea id="note_${a.id}" placeholder="e.g. Confirm physician letter is attached; strengthen guideline citation."></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button class="small" onclick="review(${a.id},'approved')">Approve framing</button>
+        <button class="small ghost" onclick="review(${a.id},'changes')">Request changes</button>
+      </div>
+    </div>`).join('') : '<div class="card"><p class="muted">Queue is clear. Nice work.</p></div>';
+  document.getElementById('recent').innerHTML = recent.length
+    ? '<table><tr><th>Service</th><th>Reason</th><th>Decision</th><th>Reviewer</th><th>When</th></tr>'+recent.map(a=>`<tr><td>${OT.esc(a.service||'—')}</td><td>${OT.esc(a.reason.replace(/_/g,' '))}</td><td><span class="badge ${a.review_status==='approved'?'ok':'warn'}">${a.review_status}</span></td><td>${OT.esc(a.reviewed_by||'')}</td><td>${a.reviewed_at?new Date(a.reviewed_at).toLocaleDateString():''}</td></tr>`).join('')+'</table>'
+    : '<p class="muted">No reviews yet.</p>';
+}
+async function review(id,decision){
+  await OT.api('/clinician/'+id+'/review',{method:'POST',body:{decision,note:document.getElementById('note_'+id).value}});
+  OT.toast(decision==='approved'?'Approved':'Changes requested'); load();
+}
+load().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

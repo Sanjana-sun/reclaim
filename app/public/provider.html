@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — provider portal</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <h1>Provider portal</h1><p class="sub" id="orgName"></p>
+  <div class="row3" id="stats"></div>
+  <h2>Denial win rates <span class="muted">(the data that compounds)</span></h2>
+  <div class="card"><div id="winByInsurer"></div></div>
+  <div class="disc">Attributed appeals are patient appeals filed with your clinic code. Recovered dollars are your revenue; our fee is a subscription (ACV) or a share of recovery per contract.</div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['provider']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+(async()=>{ const d=await OT.api('/org/overview'); document.getElementById('orgName').textContent=d.org.name+' · clinic code '+d.org.code;
+  document.getElementById('stats').innerHTML=[['Attributed appeals',d.appeals],['Win rate',d.winRate+'%'],['Recovered for clinic',OT.money(d.recovered)],['Annual contract (ACV)',OT.money(d.acv)]].map(s=>`<div class="stat"><b>${s[1]}</b><span>${s[0]}</span></div>`).join('');
+  const rows=d.stats.byInsurer.map(r=>`<tr><td>${OT.esc(r.key)}</td><td>${r.won}/${r.total}</td><td><b>${r.rate}%</b></td></tr>`).join('');
+  document.getElementById('winByInsurer').innerHTML='<table><tr><th>Insurer</th><th>Won/total</th><th>Win rate</th></tr>'+rows+'</table>';
+})().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

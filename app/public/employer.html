@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — employer portal</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <h1>Employer benefit portal</h1><p class="sub" id="orgName"></p>
+  <div class="row3" id="stats"></div>
+  <h2>Where employees win <span class="muted">(aggregate, de-identified)</span></h2>
+  <div class="card"><div id="winByReason"></div></div>
+  <div class="disc">Offered as an employee benefit priced per member per month (PMPM). Individual employee data is never exposed — only aggregate outcomes.</div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['employer']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+(async()=>{ const d=await OT.api('/org/overview'); document.getElementById('orgName').textContent=d.org.name;
+  document.getElementById('stats').innerHTML=[['Covered lives',d.coveredLives.toLocaleString()],['Fee PMPM',OT.money(d.pmpm)],['Annual contract',OT.money(d.annualRevenue)]].map(s=>`<div class="stat"><b>${s[1]}</b><span>${s[0]}</span></div>`).join('');
+  document.getElementById('winByReason').innerHTML='<table><tr><th>Denial reason</th><th>Won/total</th><th>Win rate</th></tr>'+d.stats.byReason.map(r=>`<tr><td>${OT.esc(r.key.replace(/_/g,' '))}</td><td>${r.won}/${r.total}</td><td><b>${r.rate}%</b></td></tr>`).join('')+'</table>';
+})().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — my dashboard</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <div class="tabs"><button id="t_appeals" class="active" onclick="tab('appeals')">Appeal a denial</button><button id="t_bills" onclick="tab('bills')">Dispute a bill</button></div>
+
+  <section id="sec_appeals">
+    <div id="upgradeBanner" class="card hide" style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--brand-tint);border-color:var(--brand-tint-2);">
+      <div><b>Go unlimited with Plus</b><div class="muted" style="font-size:14px;">Unlimited appeals, the bill analyzer, and priority deadline alerts — $12/mo.</div></div>
+      <button class="small" onclick="upgrade()">Upgrade to Plus</button>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0;">New appeal</h2>
+      <div class="row">
+        <div><label>Insurer</label><input id="insurer" placeholder="UnitedHealthcare"></div>
+        <div><label>Plan type</label><select id="plan"><option value="commercial">Commercial / employer</option><option value="aca">ACA marketplace</option><option value="ma">Medicare Advantage</option><option value="erisa">Self-funded (ERISA)</option></select></div>
+      </div>
+      <label>Denial reason</label>
+      <select id="reason"><option value="medical_necessity">Not medically necessary</option><option value="prior_auth">No prior authorization</option><option value="experimental">Experimental / investigational</option><option value="out_of_network">Out of network</option><option value="not_covered">Not a covered benefit</option><option value="step_therapy">Step therapy required</option><option value="coding">Coding / billing error</option></select>
+      <div class="row"><div><label>Service / treatment</label><input id="service" placeholder="MRI of left knee"></div><div><label>Medication (if any)</label><input id="drug" placeholder="Ozempic"></div></div>
+      <label>Your situation (in your words)</label><textarea id="notes" placeholder="My doctor says I need this because…"></textarea>
+      <label>Clinic code <span class="muted">(optional)</span></label><input id="providerCode" placeholder="e.g. PROVIDER">
+      <div class="disc">Self-help tool — not a law firm or medical provider. You sign and submit. No outcome guarantee.</div>
+      <button id="genBtn">Generate appeal draft</button>
+      <div id="genErr" class="err hide"></div>
+    </div>
+    <div id="appealResult" class="card hide"></div>
+    <h2>My appeals</h2><div id="appealList" class="card"><p class="muted">Loading…</p></div>
+  </section>
+
+  <section id="sec_bills" class="hide">
+    <div class="card">
+      <h2 style="margin-top:0;">Dispute a medical bill</h2>
+      <label>Provider / hospital</label><input id="billProvider" placeholder="City General Hospital">
+      <label>Itemized line items <span class="muted">— one per line: code, description, amount, units</span></label>
+      <textarea id="lineItems" style="min-height:130px;" placeholder="99285, ER visit level 5, 2200, 1
+73721, MRI knee, 1800, 1
+73721, MRI knee, 1800, 1
+80053, Metabolic panel, 210, 1"></textarea>
+      <div class="disc">You only pay a percentage of what we actually save you — and only after savings are realized.</div>
+      <button id="billBtn">Analyze bill</button>
+      <div id="billErr" class="err hide"></div>
+    </div>
+    <div id="billResult" class="card hide"></div>
+    <h2>My bill disputes</h2><div id="billList" class="card"><p class="muted">Loading…</p></div>
+  </section>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u = OT.guard(['consumer']); if(u) document.getElementById('nav').innerHTML = navBar(u);
+function tab(t){ ['appeals','bills'].forEach(x=>{ document.getElementById('sec_'+x).classList.toggle('hide',x!==t); document.getElementById('t_'+x).classList.toggle('active',x===t); }); }
+const err=(id,e)=>{const el=document.getElementById(id);el.textContent=e;el.classList.remove('hide');};
+
+document.getElementById('genBtn').addEventListener('click', async ()=>{
+  document.getElementById('genErr').classList.add('hide');
+  const body={insurer:v('insurer'),plan:v('plan'),reason:v('reason'),service:v('service'),drug:v('drug'),notes:v('notes'),providerCode:v('providerCode')};
+  try{ const {appeal,sponsored}=await OT.api('/appeals',{method:'POST',body}); renderAppeal(appeal,sponsored); loadAppeals(); }
+  catch(e){ err('genErr',e.message); }
+});
+function renderAppeal(a,sponsored){
+  const box=document.getElementById('appealResult'); box.classList.remove('hide');
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">Your appeal draft</h2><span class="badge">AI-drafted</span></div>
+    <div class="flag"><b>Deadline:</b> ${OT.esc(a.deadline_text)} (by ${new Date(a.deadline).toLocaleDateString()})</div>
+    ${a.needs_medical_necessity?'<div class="flag warn"><b>Attach your doctor\\'s letter.</b> This appeal relies on your treating physician\\'s statement of medical necessity — Overturn organizes it but does not make the medical judgment.</div>':''}
+    ${a.review_status==='pending'?'<div class="flag">In our clinical-review queue for a quality check on the medical-necessity framing.</div>':''}
+    ${a.review_status==='approved'?'<div class="flag"><b>Clinician-reviewed.</b> A licensed reviewer confirmed the medical-necessity framing'+(a.reviewer_note?': '+OT.esc(a.reviewer_note):'.')+'</div>':''}
+    ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\\'s free to you.</div>':''}
+    <div class="letter" id="letterBox" contenteditable="true">${OT.esc(a.letter)}</div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+      <button class="small" onclick="saveLetter(${a.id})">Save edits</button>
+      ${a.paid?`<button class="small" onclick="submitAppeal(${a.id})">Mark as submitted</button>`:`<button class="small" onclick="payAppeal(${a.id})">Pay $40 to finalize</button>`}
+    </div>
+    <div id="afterSubmit_${a.id}"></div>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function saveLetter(id){ await OT.api('/appeals/'+id,{method:'PUT',body:{letter:document.getElementById('letterBox').innerText}}); }
+async function payAppeal(id){
+  const r = await OT.api('/billing/pay-appeal/'+id,{method:'POST'});
+  if(r.clientSecret){ // Stripe mode: collect card + confirm, then the webhook flips `paid`
+    const ok = await stripePay(r.clientSecret);
+    if(!ok){ alert('Payment not completed.'); return; }
+    // brief poll for the webhook to mark paid
+    for(let i=0;i<5;i++){ const {appeal}=await OT.api('/appeals/'+id); if(appeal.paid){ renderAppeal(appeal,false); loadAppeals(); return; } await new Promise(s=>setTimeout(s,800)); }
+  }
+  const {appeal}=await OT.api('/appeals/'+id); renderAppeal(appeal,false); loadAppeals();
+}
+let _stripe, _elements, _card;
+function loadStripeJs(){ return new Promise((res)=>{ if(window.Stripe) return res(); const s=document.createElement('script'); s.src='https://js.stripe.com/v3/'; s.onload=res; document.head.appendChild(s); }); }
+async function stripePay(clientSecret){
+  const cfg = await OT.api('/billing/config');
+  if(!cfg.publishableKey){ alert('Stripe publishable key not configured.'); return false; }
+  await loadStripeJs();
+  _stripe = _stripe || window.Stripe(cfg.publishableKey);
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;max-width:420px;width:90%;"><h3 style="margin:0 0 12px;">Pay $'+cfg.appealPrice+' to finalize</h3><div id="card" style="border:1px solid var(--line);border-radius:9px;padding:12px;"></div><div id="cardErr" class="err hide" style="margin-top:8px;"></div><div style="display:flex;gap:10px;margin-top:16px;"><button id="payNow">Pay now</button><button class="ghost" id="payCancel">Cancel</button></div></div>';
+  document.body.appendChild(ov);
+  _elements = _stripe.elements(); _card = _elements.create('card'); _card.mount('#card');
+  return new Promise((resolve)=>{
+    document.getElementById('payCancel').onclick=()=>{ ov.remove(); resolve(false); };
+    document.getElementById('payNow').onclick=async()=>{
+      const {error,paymentIntent}=await _stripe.confirmCardPayment(clientSecret,{payment_method:{card:_card}});
+      if(error){ const e=document.getElementById('cardErr'); e.textContent=error.message; e.classList.remove('hide'); return; }
+      ov.remove(); resolve(paymentIntent && paymentIntent.status==='succeeded');
+    };
+  });
+}
+async function submitAppeal(id){ await OT.api('/appeals/'+id+'/submit',{method:'POST'}); document.getElementById('afterSubmit_'+id).innerHTML='<div class="flag">Submitted. When you hear back, record the outcome below so we learn.</div><div style="display:flex;gap:8px;"><button class="small" onclick="outcome('+id+',\\'won\\')">It was overturned 🎉</button><button class="small ghost" onclick="outcome('+id+',\\'lost\\')">Denied again</button></div>'; loadAppeals(); }
+async function outcome(id,o){ let amt=0; if(o==='won'){ amt=prompt('Roughly how much was covered/recovered? ($)','0'); } await OT.api('/appeals/'+id+'/outcome',{method:'POST',body:{outcome:o,amountRecovered:Number(amt)||0}}); loadAppeals(); }
+async function loadAppeals(){ const {appeals}=await OT.api('/appeals'); const el=document.getElementById('appealList');
+  if(!appeals.length){ el.innerHTML='<p class="muted">No appeals yet.</p>'; return; }
+  el.innerHTML='<table><tr><th>Service</th><th>Insurer</th><th>Status</th><th>Deadline</th><th>Recovered</th></tr>'+appeals.map(a=>`<tr><td>${OT.esc(a.service||'—')}</td><td>${OT.esc(a.insurer||'—')}</td><td><span class="badge ${a.status==='won'?'':a.status==='lost'?'gray':'warn'}">${a.status}</span></td><td>${new Date(a.deadline).toLocaleDateString()}</td><td>${a.amount_recovered?OT.money(a.amount_recovered):'—'}</td></tr>`).join('')+'</table>';
+}
+
+document.getElementById('billBtn').addEventListener('click', async ()=>{
+  document.getElementById('billErr').classList.add('hide');
+  const lineItems=v('lineItems').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split(',');return {code:(p[0]||'').trim(),desc:(p[1]||'').trim(),amount:parseFloat(p[2])||0,units:parseInt(p[3])||1};});
+  if(!lineItems.length){ err('billErr','Add at least one line item.'); return; }
+  try{ const {bill}=await OT.api('/bills',{method:'POST',body:{providerName:v('billProvider'),lineItems}}); renderBill(bill); loadBills(); }
+  catch(e){ err('billErr',e.message); }
+});
+function renderBill(b){
+  const box=document.getElementById('billResult'); box.classList.remove('hide');
+  const f=b.findings.map(x=>`<tr><td>${x.line}</td><td>${OT.esc(x.code)}</td><td><span class="badge warn">${x.type.replace(/_/g,' ')}</span></td><td>${OT.esc(x.desc)}</td><td>${OT.money(x.saving)}</td></tr>`).join('');
+  box.innerHTML=`<h2 style="margin-top:0;">Bill analysis</h2>
+    <div class="row3"><div class="stat"><b>${OT.money(b.total_amount)}</b><span>total billed</span></div><div class="stat"><b>${b.findings.length}</b><span>issues found</span></div><div class="stat"><b>${OT.money(b.estimated_savings)}</b><span>potential savings</span></div></div>
+    ${b.findings.length?`<table style="margin-top:14px;"><tr><th>Line</th><th>Code</th><th>Issue</th><th>Detail</th><th>Est. adj.</th></tr>${f}</table>`:'<p class="muted">No automated findings — you can still send the dispute for a manual review.</p>'}
+    <h3>Draft dispute letter</h3><div class="letter">${OT.esc(b.dispute_letter)}</div>
+    <div class="flag">When the provider adjusts the bill, record what you saved. Our fee is ${Math.round(b.contingency_rate*100)}% of realized savings — charged only then.</div>
+    <button class="small" onclick="recordSaving(${b.id})">Record realized savings</button><div id="saved_${b.id}"></div>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function recordSaving(id){ const amt=Number(prompt('How much did the provider actually reduce the bill? ($)','0'))||0; const {fee}=await OT.api('/bills/'+id+'/outcome',{method:'POST',body:{amountSaved:amt}}); document.getElementById('saved_'+id).innerHTML=`<div class="flag">Saved ${OT.money(amt)}. Our fee: ${OT.money(fee)}.</div>`; loadBills(); }
+async function loadBills(){ const {bills}=await OT.api('/bills'); const el=document.getElementById('billList');
+  if(!bills.length){ el.innerHTML='<p class="muted">No disputes yet.</p>'; return; }
+  el.innerHTML='<table><tr><th>Provider</th><th>Billed</th><th>Est. savings</th><th>Saved</th><th>Status</th></tr>'+bills.map(b=>`<tr><td>${OT.esc(b.provider_name||'—')}</td><td>${OT.money(b.total_amount)}</td><td>${OT.money(b.estimated_savings)}</td><td>${b.amount_saved?OT.money(b.amount_saved):'—'}</td><td><span class="badge ${b.status==='resolved'?'':'warn'}">${b.status}</span></td></tr>`).join('')+'</table>';
+}
+async function checkSub(){
+  try{ const {subscription}=await OT.api('/billing/mine'); if(!subscription) document.getElementById('upgradeBanner').classList.remove('hide'); }catch(e){}
+}
+async function upgrade(){
+  const r=await OT.api('/billing/subscribe',{method:'POST',body:{origin:location.origin}});
+  if(r.checkoutUrl){ location.href=r.checkoutUrl; return; }
+  OT.toast('You\'re on Plus 🎉'); document.getElementById('upgradeBanner').classList.add('hide');
+}
+if(new URLSearchParams(location.search).get('sub')==='success') OT.toast('Subscription active — welcome to Plus!');
+function v(id){return document.getElementById(id).value.trim();}
+loadAppeals(); loadBills(); checkSub();
+</script>
+</body></html>

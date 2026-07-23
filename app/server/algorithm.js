@@ -1,0 +1,186 @@
+const { find, insert } = require('./db');
+const { callClaude, available } = require('./llm');
+const prompts = require('./prompts');
+
+// ---------------------------------------------------------------------------
+// Reference data. Deadlines are owned by deterministic rules, never the model.
+// ---------------------------------------------------------------------------
+const DEADLINES = {
+  commercial: { days: 180, text: 'Generally 180 days from the denial to file an internal appeal. Confirm the exact date on your denial letter.' },
+  aca: { days: 180, text: '180 days to file an internal appeal; external review available afterward.' },
+  ma: { days: 65, text: 'Medicare Advantage: generally 65 days to file a reconsideration. These are overturned at a high rate.' },
+  erisa: { days: 180, text: 'Self-funded (ERISA) plans: typically 180 days. Deadlines are strict — file early.' },
+};
+
+const REASON_ARG = {
+  medical_necessity: 'This service is medically necessary. My treating physician has determined it is required to diagnose or treat my condition, consistent with generally accepted standards of care and the plan\'s own medical policy. My physician\'s statement of medical necessity and supporting records are attached.',
+  prior_auth: 'The prior-authorization requirement should not bar payment here. Please review the claim on its clinical merits, taking into account the circumstances described below.',
+  experimental: 'This treatment is not experimental or investigational for my condition. It is supported by published clinical guidelines and standard medical practice, as documented by my physician in the attached materials.',
+  out_of_network: 'Network-adequacy and continuity-of-care protections apply. Please reprocess the claim at the in-network rate given the circumstances described below.',
+  not_covered: 'This service should be covered under the terms of my plan. Please identify the specific plan language relied on to deny it and reconsider in light of the attached documentation.',
+  step_therapy: 'A step-therapy exception is warranted. My physician supports this exception for the reasons described below and in the attached letter.',
+  coding: 'This appears to be a coding or billing error. Please review the coding on the attached itemized statement and reprocess the claim correctly.',
+};
+
+const MN_REASONS = ['medical_necessity', 'experimental', 'step_therapy'];
+const VALID_REASONS = Object.keys(REASON_ARG);
+
+// ---------------------------------------------------------------------------
+// 1. Classifier — rules first; optional LLM refinement of free text.
+// ---------------------------------------------------------------------------
+async function classify(intake) {
+  let reason = VALID_REASONS.includes(intake.reason) ? intake.reason : 'medical_necessity';
+  const planType = DEADLINES[intake.plan] ? intake.plan : 'commercial';
+
+  if (available() && intake.notes && intake.notes.length > 20) {
+    const out = await callClaude({
+      model: process.env.CLASSIFY_MODEL,
+      maxTokens: 20,
+      system: prompts.classifySystem(VALID_REASONS),
+      user: `Stated reason: ${intake.reason}; service: ${intake.service}; notes: ${intake.notes}`,
+    });
+    if (out) { const guess = out.trim().toLowerCase().replace(/[^a-z_]/g, ''); if (VALID_REASONS.includes(guess)) reason = guess; }
+  }
+
+  const d = DEADLINES[planType];
+  return {
+    reason, planType,
+    deadlineDays: d.days, deadlineText: d.text,
+    needsMedicalNecessity: MN_REASONS.includes(reason),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 2. Drafter — Claude if available, else template. Always run through linter.
+// ---------------------------------------------------------------------------
+async function draftAppeal(intake, cls) {
+  let letter = null;
+  if (available()) {
+    letter = await callClaude({ system: prompts.DRAFT_SYSTEM, user: prompts.draftUser(intake, cls), maxTokens: 1400 });
+  }
+  if (!letter) letter = templateLetter(intake, cls);
+  return lint(letter, cls);
+}
+
+function templateLetter(intake, cls) {
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const subject = (intake.service || '[service]') + (intake.drug ? ` (${intake.drug})` : '');
+  return `${today}
+
+${intake.insurer || '[Insurer]'}
+Attn: Appeals Department
+
+Re: Appeal of claim denial — ${subject}
+Member: [Your name]   Member ID: [ID]   Claim #: [claim number]
+
+To the Appeals Department:
+
+I am writing to formally appeal your denial of coverage for ${subject}, and I request that you overturn this denial and cover the claim.
+
+${REASON_ARG[cls.reason]}
+
+${intake.notes ? `Additional context:\n${intake.notes}\n` : ''}
+I request a full and fair review of this appeal, including review by an appropriately qualified professional. Please provide a written explanation of your decision and the specific plan provisions relied upon.
+
+Attached: (1) the denial letter, (2) my physician's supporting documentation, and (3) relevant medical records.
+
+Sincerely,
+[Your signature]
+[Your name]
+[Phone] · [Email]`;
+}
+
+// ---------------------------------------------------------------------------
+// 3. Safety linter — strips guarantees / "lawyer" claims, appends disclaimer.
+// ---------------------------------------------------------------------------
+function lint(text, cls) {
+  let t = text;
+  const banned = [/\bwe guarantee\b/gi, /\bguaranteed\b/gi, /\bwill definitely win\b/gi, /\bas your (lawyer|attorney)\b/gi, /\brobot lawyer\b/gi];
+  banned.forEach((re) => { t = t.replace(re, ''); });
+  const disclaimer = '\n\n---\nPrepared with Overturn, a self-help document tool (not a law firm or medical provider; not legal or medical advice). You review, sign, and submit this appeal yourself.';
+  if (!t.includes('self-help document tool')) t += disclaimer;
+  return { letter: t.trim(), needsMedicalNecessity: cls.needsMedicalNecessity };
+}
+
+// ---------------------------------------------------------------------------
+// 4. Medical-bill error / variance detection (contingency engine).
+// ---------------------------------------------------------------------------
+const BENCHMARK = { '99213': 120, '99214': 180, '99215': 250, '73721': 450, '80053': 45, '85025': 30, '36415': 12, '99284': 700, '99285': 1100, '70450': 900 };
+
+function detectBillErrors(lineItems) {
+  const findings = [];
+  const seen = {};
+  lineItems.forEach((li, idx) => {
+    const code = String(li.code || '').trim();
+    const amount = Number(li.amount) || 0;
+    const units = Number(li.units) || 1;
+    const key = code + '|' + amount;
+    if (seen[key]) findings.push({ line: idx + 1, type: 'duplicate', code, desc: `Duplicate charge for ${code} (${li.desc || ''})`, saving: amount });
+    seen[key] = true;
+    const bench = BENCHMARK[code];
+    if (bench && amount > bench * 1.5) findings.push({ line: idx + 1, type: 'above_benchmark', code, desc: `${code} billed at $${amount}, well above typical ~$${bench}`, saving: Math.round(amount - bench) });
+    if (units > 1 && bench) {
+      const expected = bench * units;
+      if (amount > expected * 1.4) findings.push({ line: idx + 1, type: 'unit_overcharge', code, desc: `${units} units of ${code} billed at $${amount} vs expected ~$${expected}`, saving: Math.round(amount - expected) });
+    }
+    if (/level 5|comprehensive|highest/i.test(li.desc || '') && (code === '99215' || code === '99285')) {
+      findings.push({ line: idx + 1, type: 'possible_upcoding', code, desc: `${code} is a highest-complexity code — verify the visit supports it`, saving: Math.round(amount * 0.4) });
+    }
+  });
+  const estimatedSavings = findings.reduce((s, f) => s + (f.saving || 0), 0);
+  return { findings, estimatedSavings };
+}
+
+function draftDisputeLetter(bill, findings) {
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const lines = findings.map((f) => `  • Line ${f.line} (${f.code}) — ${f.desc}. Requested adjustment: ~$${f.saving}.`).join('\n');
+  const letter = `${today}
+
+${bill.provider_name || '[Provider]'}
+Attn: Billing Department
+
+Re: Itemized bill review and dispute
+Patient: [Your name]   Account #: [account number]   Total billed: $${bill.total_amount}
+
+To the Billing Department:
+
+I have reviewed the itemized statement for the above account and identified the following items I believe are billed in error. I request that they be corrected and the balance adjusted before any payment or collection activity proceeds:
+
+${lines || '  • [No automated findings — attach itemized bill for manual review.]'}
+
+Please send a corrected itemized statement reflecting these adjustments. I am happy to discuss, and I request that collection activity be paused while this dispute is reviewed.
+
+Sincerely,
+[Your signature]
+[Your name]
+[Phone] · [Email]
+
+---
+Prepared with Overturn, a self-help document tool. Not legal advice. You review, sign, and submit this dispute yourself.`;
+  return letter;
+}
+
+// ---------------------------------------------------------------------------
+// 5. Win-rate data flywheel (deidentified — the compounding moat).
+// ---------------------------------------------------------------------------
+async function recordOutcome({ insurer, planType, reason, outcome }) {
+  await insert('winrate', { insurer, plan_type: planType, reason, outcome });
+}
+
+async function winStats() {
+  const rows = await find('winrate');
+  const by = (keyFn) => {
+    const m = {};
+    rows.forEach((r) => {
+      const k = keyFn(r);
+      m[k] = m[k] || { won: 0, total: 0 };
+      m[k].total++; if (r.outcome === 'won') m[k].won++;
+    });
+    return Object.entries(m).map(([k, v]) => ({ key: k, won: v.won, total: v.total, rate: v.total ? Math.round((v.won / v.total) * 100) : 0 }))
+      .sort((a, b) => b.total - a.total);
+  };
+  const overall = rows.length ? Math.round((rows.filter((r) => r.outcome === 'won').length / rows.length) * 100) : 0;
+  return { overall, total: rows.length, byInsurer: by((r) => r.insurer), byReason: by((r) => r.reason) };
+}
+
+module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, DEADLINES };

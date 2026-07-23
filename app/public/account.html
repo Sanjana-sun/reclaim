@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Account — Overturn</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap" style="max-width:760px;">
+  <h1>Account</h1>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Profile</h3>
+    <label>Name</label><input id="name">
+    <label>Email</label><input id="email" disabled>
+    <button class="small" style="margin-top:14px;" onclick="saveProfile()">Save changes</button>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Security</h3>
+    <div id="secErr" class="err hide"></div>
+    <div class="row">
+      <div>
+        <label>Change email</label>
+        <input id="newEmail" type="email" placeholder="new@email.com">
+        <input id="emailPw" type="password" placeholder="Current password" style="margin-top:8px;">
+        <button class="small" style="margin-top:10px;" onclick="changeEmail()">Update email</button>
+      </div>
+      <div>
+        <label>Change password</label>
+        <input id="curPw" type="password" placeholder="Current password">
+        <input id="newPw" type="password" placeholder="New password (min 6)" style="margin-top:8px;">
+        <button class="small" style="margin-top:10px;" onclick="changePassword()">Update password</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="page-title"><h3 style="margin:0;">Subscription</h3><span class="badge" id="subBadge">—</span></div>
+    <p class="muted" id="subText">Loading…</p>
+    <div id="subActions"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Billing history</h3>
+    <div id="payments"><p class="muted">Loading…</p></div>
+  </div>
+
+  <div class="card" style="border-color:var(--danger-bg);">
+    <h3 style="margin-top:0;color:var(--danger);">Danger zone</h3>
+    <p class="muted">Permanently delete your account and all your appeals, bills, and payment records. This can't be undone.</p>
+    <button class="small ghost" style="color:var(--danger)!important;border-color:var(--danger)!important;" onclick="delAccount()">Delete my account</button>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['consumer']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+async function load(){
+  const {user}=await OT.api('/auth/me');
+  document.getElementById('name').value=user.name||'';
+  document.getElementById('email').value=user.email;
+  const {subscription,payments}=await OT.api('/billing/mine');
+  const badge=document.getElementById('subBadge'), text=document.getElementById('subText'), act=document.getElementById('subActions');
+  if(subscription && subscription.status==='active'){
+    badge.textContent='Plus · active'; badge.className='badge ok';
+    text.textContent='Unlimited appeals, the bill analyzer, and priority deadline alerts. Renews '+new Date(subscription.current_period_end).toLocaleDateString()+'.';
+    act.innerHTML='<button class="small ghost" onclick="cancelSub()">Cancel subscription</button>';
+  }else{
+    badge.textContent='Free'; badge.className='badge gray';
+    text.textContent='You\\'re on pay-as-you-go ($40/appeal). Upgrade to Plus for unlimited appeals and the bill analyzer at $12/mo.';
+    act.innerHTML='<button class="small" onclick="upgrade()">Upgrade to Plus</button>';
+  }
+  const p=document.getElementById('payments');
+  p.innerHTML = payments.length
+    ? '<table><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th></tr>'+payments.slice().reverse().map(x=>`<tr><td>${new Date(x.created_at).toLocaleDateString()}</td><td>${OT.esc((x.ref_type||x.engine||'').replace(/_/g,' '))}</td><td>${OT.money(x.amount)}</td><td><span class="badge ${x.status==='succeeded'?'ok':'warn'}">${OT.esc(x.status)}</span></td></tr>`).join('')+'</table>'
+    : '<p class="muted">No charges yet.</p>';
+}
+async function saveProfile(){ await OT.api('/auth/me',{method:'PUT',body:{name:document.getElementById('name').value}}); OT.toast('Profile saved'); }
+function secErr(e){ const el=document.getElementById('secErr'); el.textContent=e; el.classList.remove('hide'); }
+async function changeEmail(){
+  document.getElementById('secErr').classList.add('hide');
+  try{ const {user}=await OT.api('/auth/change-email',{method:'POST',body:{newEmail:document.getElementById('newEmail').value.trim(),password:document.getElementById('emailPw').value}});
+    document.getElementById('email').value=user.email; const cur=OT.user(); cur.email=user.email; OT.setAuth(OT.token(),cur);
+    document.getElementById('newEmail').value=''; document.getElementById('emailPw').value=''; OT.toast('Email updated'); }
+  catch(e){ secErr(e.message); }
+}
+async function changePassword(){
+  document.getElementById('secErr').classList.add('hide');
+  try{ await OT.api('/auth/change-password',{method:'POST',body:{currentPassword:document.getElementById('curPw').value,newPassword:document.getElementById('newPw').value}});
+    document.getElementById('curPw').value=''; document.getElementById('newPw').value=''; OT.toast('Password updated'); }
+  catch(e){ secErr(e.message); }
+}
+async function upgrade(){ const r=await OT.api('/billing/subscribe',{method:'POST',body:{origin:location.origin}}); if(r.checkoutUrl){location.href=r.checkoutUrl;return;} OT.toast('Welcome to Plus 🎉'); load(); }
+async function cancelSub(){ if(!confirm('Cancel your Plus subscription?'))return; await OT.api('/billing/cancel',{method:'POST'}); OT.toast('Subscription canceled'); load(); }
+async function delAccount(){ if(!confirm('Permanently delete your account and all data? This cannot be undone.'))return; await OT.api('/auth/me',{method:'DELETE'}); OT.toast('Account deleted'); setTimeout(()=>OT.logout(),800); }
+load().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

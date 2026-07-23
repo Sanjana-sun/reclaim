@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overturn — fight your insurance denial</title>
+<style>
+  :root { --ink:#12140f; --mut:#5c5f57; --line:#e2e1d9; --bg:#faf9f5; --card:#fff; --accent:#1d6b52; --accentbg:#e4f2ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg); line-height:1.6; }
+  .wrap { max-width:760px; margin:0 auto; padding:0 20px 80px; }
+  header { text-align:center; padding:56px 0 24px; }
+  h1 { font-size:34px; line-height:1.2; margin:0 0 12px; }
+  .sub { font-size:18px; color:var(--mut); max-width:560px; margin:0 auto; }
+  .stat { display:flex; gap:24px; justify-content:center; flex-wrap:wrap; margin:28px 0 8px; }
+  .stat div { text-align:center; }
+  .stat b { display:block; font-size:24px; color:var(--accent); }
+  .stat span { font-size:13px; color:var(--mut); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px; margin:20px 0; }
+  label { display:block; font-size:13px; font-weight:600; margin:14px 0 4px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; font-size:15px; font-family:inherit; background:#fff; }
+  textarea { min-height:80px; resize:vertical; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:9px; padding:12px 20px; font-size:15px; font-weight:600; cursor:pointer; }
+  button.ghost { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .disc { font-size:12px; color:var(--mut); background:#f3f2ec; border-radius:9px; padding:10px 12px; margin:14px 0; }
+  .ai-badge { display:inline-block; font-size:12px; font-weight:600; color:var(--accent); background:var(--accentbg); padding:3px 10px; border-radius:20px; }
+  .letter { white-space:pre-wrap; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:13px; line-height:1.7; background:#fff; border:1px solid var(--line); border-radius:9px; padding:18px; max-height:420px; overflow:auto; }
+  .hide { display:none; }
+  .muted { color:var(--mut); font-size:14px; }
+  .flag { border-left:3px solid var(--accent); padding:4px 0 4px 12px; margin:12px 0; font-size:14px; }
+  @media(max-width:560px){ .row{grid-template-columns:1fr;} h1{font-size:27px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="ai-badge">AI-assisted · you review and send it yourself</span>
+    <h1 style="margin-top:16px;">Denied by your insurer? Fight back in 5 minutes.</h1>
+    <p class="sub">Most denials are never appealed — yet nearly half of appeals win. Overturn helps you draft a strong, evidence-backed appeal you sign and submit yourself.</p>
+    <div class="stat">
+      <div><b>&lt;1%</b><span>of denials get appealed</span></div>
+      <div><b>44–60%</b><span>of appeals win</span></div>
+      <div><b>~77%</b><span>are paperwork errors</span></div>
+    </div>
+  </header>
+
+  <div class="card" id="intakeCard">
+    <h2 style="margin-top:0;">Tell us about your denial</h2>
+    <div class="row">
+      <div><label>Your insurer</label><input id="insurer" placeholder="e.g. UnitedHealthcare"></div>
+      <div><label>Plan type</label>
+        <select id="plan">
+          <option value="commercial">Commercial / employer</option>
+          <option value="aca">ACA marketplace</option>
+          <option value="ma">Medicare Advantage</option>
+          <option value="erisa">Self-funded employer (ERISA)</option>
+        </select>
+      </div>
+    </div>
+    <label>Why was it denied?</label>
+    <select id="reason">
+      <option value="medical_necessity">Not medically necessary</option>
+      <option value="prior_auth">No prior authorization</option>
+      <option value="experimental">Experimental / investigational</option>
+      <option value="out_of_network">Out of network</option>
+      <option value="not_covered">Not a covered benefit</option>
+      <option value="step_therapy">Step therapy required first</option>
+      <option value="coding">Coding / billing error</option>
+    </select>
+    <div class="row">
+      <div><label>Service or treatment denied</label><input id="service" placeholder="e.g. MRI of left knee"></div>
+      <div><label>Medication (if any)</label><input id="drug" placeholder="e.g. Ozempic"></div>
+    </div>
+    <label>Anything else? (your situation, in your words)</label>
+    <textarea id="notes" placeholder="e.g. My doctor says I need this because…"></textarea>
+
+    <div class="disc">Overturn is a self-help document-preparation tool. It is <b>not a law firm and not a medical provider</b>, and this is not legal or medical advice. You review, sign, and submit your own appeal. We can't guarantee any outcome.</div>
+    <button id="genBtn" style="margin-top:6px;">Generate my appeal draft</button>
+  </div>
+
+  <div class="card hide" id="resultCard">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Your appeal draft</h2><span class="ai-badge">AI-drafted</span>
+    </div>
+    <div class="flag" id="deadlineFlag"></div>
+    <div id="mnFlag" class="flag hide"><b>Attach your doctor's letter.</b> This appeal relies on your treating physician's statement of medical necessity — Overturn organizes and references it but does not make the medical judgment. Ask your doctor for a brief letter of medical necessity and attach it.</div>
+    <p class="muted">Edit anything below, then download and send it to your insurer yourself.</p>
+    <div class="letter" id="letter" contenteditable="true"></div>
+    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+      <button onclick="copyLetter()">Copy text</button>
+      <button class="ghost" onclick="restart()">Start over</button>
+    </div>
+
+    <div style="border-top:1px solid var(--line); margin-top:22px; padding-top:18px;">
+      <h3 style="margin:0 0 6px;">Want us to finalize + track deadlines for you?</h3>
+      <p class="muted" style="margin:0 0 10px;">Join the beta. We'll notify you before your appeal deadline and help with the next step if it's denied again.</p>
+      <div class="row">
+        <input id="email" placeholder="you@email.com">
+        <button onclick="joinBeta()">Join the beta — $40/appeal</button>
+      </div>
+      <p class="muted" id="betaMsg" style="margin:10px 0 0;"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Template engine (v1). This is the placeholder for the real LLM call. ----
+// In production, replace buildLetter() with a call to the Anthropic API:
+//   1. Haiku classifies reason + plan -> selects template + deadline rule (deterministic).
+//   2. Opus fills the draft. 3. A safety linter strips guarantees / adds disclaimers.
+// The medical-necessity module only FORMATS clinician-provided evidence; it never
+// generates a clinical opinion. Deadlines come from rules, never the model.
+
+var DEADLINES = {
+  commercial: "You generally have 180 days from the denial to file an internal appeal. Check your denial letter for the exact deadline.",
+  aca: "ACA plans: you have 180 days to file an internal appeal, and you can request external review after.",
+  ma: "Medicare Advantage: you generally have 65 days to file a reconsideration. Denials are overturned at a high rate on appeal.",
+  erisa: "Self-funded (ERISA) plans: you typically have 180 days to appeal. Deadlines are strict — file early."
+};
+
+var REASON_ARG = {
+  medical_necessity: "This service is medically necessary. My treating physician has determined it is required to diagnose or treat my condition, consistent with generally accepted standards of care and the plan's own medical policy. I am attaching my physician's statement of medical necessity and supporting records.",
+  prior_auth: "The requirement for prior authorization should not bar payment here. [Describe if it was an emergency, if authorization was requested, or if the service is not one that requires it under the plan.] I request that the claim be reviewed on its clinical merits.",
+  experimental: "This treatment is not experimental or investigational for my condition. It is supported by published clinical guidelines and standard medical practice, as documented by my physician. I am attaching the supporting evidence.",
+  out_of_network: "Network-adequacy and continuity-of-care protections apply here. [Describe if no in-network provider was available, if this was emergency care, or if you were referred out of network.] I request the claim be paid at the in-network rate.",
+  not_covered: "This service should be covered under the terms of my plan. Please identify the specific plan language relied on to deny it, and reconsider in light of the documentation attached.",
+  step_therapy: "A step-therapy exception is warranted. [Describe if you already tried and failed the required drug, had an adverse reaction, or it is medically inappropriate.] My physician supports this exception, as documented in the attached letter.",
+  coding: "This appears to be a coding or billing error. The service was [describe]. Please review the coding on the attached itemized statement and reprocess the claim correctly."
+};
+
+function val(id){ return (document.getElementById(id).value || "").trim(); }
+
+function buildLetter(){
+  var insurer = val("insurer") || "[Insurer]";
+  var plan = val("plan");
+  var reason = val("reason");
+  var service = val("service") || "[service/treatment]";
+  var drug = val("drug");
+  var notes = val("notes");
+  var today = new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"});
+  var subject = service + (drug ? " ("+drug+")" : "");
+
+  var body =
+"" + today + "\n\n" +
+insurer + "\nAttn: Appeals Department\n\n" +
+"Re: Appeal of claim denial — " + subject + "\nMember: [Your name]   Member ID: [ID]   Claim #: [claim number]\n\n" +
+"To the Appeals Department:\n\n" +
+"I am writing to formally appeal your denial of coverage for " + subject + ". I am requesting that you overturn this denial and cover the claim.\n\n" +
+REASON_ARG[reason] + "\n\n" +
+(notes ? ("Additional context:\n" + notes + "\n\n") : "") +
+"I request a full and fair review of this appeal, including review by an appropriately qualified professional. Please provide a written explanation of your decision and the specific plan provisions relied upon.\n\n" +
+"I am attaching: (1) a copy of the denial letter, (2) my physician's supporting documentation, and (3) any relevant medical records.\n\n" +
+"Thank you for your prompt attention. I look forward to your response within the timeframe required by my plan.\n\n" +
+"Sincerely,\n[Your signature]\n[Your name]\n[Phone] · [Email]";
+
+  return { body: body, deadline: DEADLINES[plan], needsMN: (reason==="medical_necessity"||reason==="experimental"||reason==="step_therapy") };
+}
+
+document.getElementById("genBtn").addEventListener("click", function(){
+  var out = buildLetter();
+  document.getElementById("letter").textContent = out.body;
+  document.getElementById("deadlineFlag").innerHTML = "<b>Deadline:</b> " + out.deadline;
+  document.getElementById("mnFlag").classList.toggle("hide", !out.needsMN);
+  document.getElementById("intakeCard").classList.add("hide");
+  document.getElementById("resultCard").classList.remove("hide");
+  window.scrollTo({top:0, behavior:"smooth"});
+  log("generate", {reason: val("reason"), plan: val("plan")});
+});
+
+function copyLetter(){
+  navigator.clipboard.writeText(document.getElementById("letter").innerText);
+  log("copy", {});
+}
+function restart(){
+  document.getElementById("resultCard").classList.add("hide");
+  document.getElementById("intakeCard").classList.remove("hide");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function joinBeta(){
+  var email = val("email");
+  var msg = document.getElementById("betaMsg");
+  if(!/.+@.+\..+/.test(email)){ msg.textContent = "Please enter a valid email."; return; }
+  log("beta_signup", {email: email, reason: val("reason")});
+  msg.textContent = "You're on the list — we'll be in touch. (Validation build: saved locally, no charge made.)";
+}
+
+// ---- Lightweight validation logging (localStorage stand-in for analytics) ----
+function log(event, data){
+  var events = JSON.parse(localStorage.getItem("overturn_events") || "[]");
+  events.push({event:event, data:data, t: Date.now()});
+  localStorage.setItem("overturn_events", JSON.stringify(events));
+}
+</script>
+</body>
+</html>

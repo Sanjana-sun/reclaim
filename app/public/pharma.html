@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overturn — pharma portal</title><link rel="stylesheet" href="css/app.css"></head><body>
+<div id="nav"></div>
+<div class="wrap">
+  <h1>Pharma sponsorship portal</h1><p class="sub" id="orgName"></p>
+  <div class="row3" id="stats"></div>
+  <h2>Sponsored programs</h2><div class="card"><div id="programs"></div></div>
+  <div class="card">
+    <h3 style="margin-top:0;">Add / update a program</h3>
+    <div class="row3"><div><label>Drug</label><input id="drug" placeholder="Mounjaro"></div><div><label>Budget ($)</label><input id="budget" type="number" value="200000"></div><div><label>Fee / appeal ($)</label><input id="rate" type="number" value="75"></div></div>
+    <button id="saveProg" style="margin-top:12px;">Save program</button>
+    <p class="muted" style="margin-top:10px;">When a patient's denied appeal names a sponsored drug, it's filed free to them and billed to your program — unlocking scripts that would otherwise be abandoned.</p>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const u=OT.guard(['pharma']); if(u) document.getElementById('nav').innerHTML=navBar(u);
+async function load(){ const d=await OT.api('/org/overview'); document.getElementById('orgName').textContent=d.org.name;
+  document.getElementById('stats').innerHTML=[['Sponsored appeals',d.totalSponsored],['Scripts unlocked',d.programs.reduce((s,p)=>s+p.scriptsUnlocked,0)],['Program spend',OT.money(d.spend)]].map(s=>`<div class="stat"><b>${s[1]}</b><span>${s[0]}</span></div>`).join('');
+  document.getElementById('programs').innerHTML='<table><tr><th>Drug</th><th>Appeals</th><th>Won</th><th>Win rate</th><th>Rate</th><th>Budget</th></tr>'+d.programs.map(p=>`<tr><td>${OT.esc(p.drug)}</td><td>${p.appeals}</td><td>${p.won}</td><td>${p.winRate}%</td><td>${OT.money(p.rate)}</td><td>${OT.money(p.budget)}</td></tr>`).join('')+'</table>';
+}
+document.getElementById('saveProg').addEventListener('click', async ()=>{ await OT.api('/org/sponsored-programs',{method:'POST',body:{drug:document.getElementById('drug').value.trim(),budget:+document.getElementById('budget').value,rate:+document.getElementById('rate').value}}); load(); });
+load().catch(e=>document.body.insertAdjacentHTML('beforeend','<p class="err">'+e.message+'</p>'));
+</script>
+</body></html>

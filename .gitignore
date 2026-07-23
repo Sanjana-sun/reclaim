@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# local data store (JSON backend) — never commit
+app/data/
+data/
+
+# secrets / env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# scratch
+*.tmp
