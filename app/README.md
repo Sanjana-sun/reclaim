@@ -50,6 +50,8 @@ The app runs with zero config; each env var lights up a real integration:
 | `ANTHROPIC_API_KEY` | Claude drafts/classifies appeals | Deterministic templates |
 | `DATABASE_URL` | Postgres (JSONB store, auto-migrated + seeded) | Local JSON file |
 | `STRIPE_SECRET_KEY` | Real Stripe PaymentIntents | Auto-succeeding stub |
+| `RESEND_API_KEY` | Real email (deadline reminders, password reset) | Logs to console |
+| `ANALYTICS_DOMAIN`+`ANALYTICS_SRC` | Privacy-friendly analytics (e.g. Plausible) | Off |
 
 Example Postgres run:
 ```bash

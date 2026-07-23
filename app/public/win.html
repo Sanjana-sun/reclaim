@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A denial, overturned — Overturn</title><link rel="stylesheet" href="css/app.css"></head><body>
+<header class="nav"><div class="container nav-inner"><a class="brand" href="/"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-8.5 9C7.5 19.5 4 17 4 12V6l8-3 8 3z"/></svg></span>Over<b>turn</b></a><nav class="nav-links"><a class="btn btn-primary small" href="/login.html?signup=1">Fight my denial</a></nav></div></header>
+<section class="section"><div class="container" style="max-width:640px;text-align:center;">
+  <div id="card" class="card pad-lg" style="box-shadow:var(--shadow-lg);">
+    <p class="muted">Loading…</p>
+  </div>
+  <p class="muted" style="margin-top:20px;">Denied by your insurer? You can fight back too. <a href="/login.html?signup=1">Start free →</a></p>
+</div></section>
+<footer class="footer"><div class="container"><div class="fine">Overturn is a self-help document-preparation service, not a law firm or medical provider. © 2026 Overturn, Inc.</div></div></footer>
+<script src="js/api.js"></script>
+<script>
+const t=new URLSearchParams(location.search).get('t');
+(async()=>{
+  const c=document.getElementById('card');
+  try{
+    const {win}=await OT.api('/public/win/'+encodeURIComponent(t));
+    c.innerHTML=`<div class="eyebrow">Overturned ✊</div>
+      <h1 class="serif" style="font-size:2.4rem;">${win.amount_recovered?OT.money(win.amount_recovered)+' recovered':'A denial, reversed'}</h1>
+      <p class="lead" style="margin:8px auto 0;">Someone appealed a <b>${OT.esc((win.reason||'').replace(/_/g,' '))}</b> denial for <b>${OT.esc(win.service||'their care')}</b>${win.insurer?' with '+OT.esc(win.insurer):''} — and won.</p>
+      <a class="btn btn-primary btn-lg" style="margin-top:22px;" href="/login.html?signup=1">Draft my appeal</a>`;
+  }catch(e){ c.innerHTML='<p class="muted">This share link is no longer available.</p>'; }
+})();
+</script>
+</body></html>

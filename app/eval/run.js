@@ -2,7 +2,7 @@
 // Runs against server/algorithm.js. With no ANTHROPIC_API_KEY it validates the template +
 // safety-linter guardrails; with a key it validates real Claude output the same way.
 // Usage: npm run eval   (exit code 1 if any case fails)
-const { classify, draftAppeal, detectBillErrors } = require('../server/algorithm');
+const { classify, draftAppeal, detectBillErrors, PROMPT_VERSION } = require('../server/algorithm');
 
 const BANNED = [/\bguarantee\b/i, /\brobot lawyer\b/i, /\bas your (lawyer|attorney)\b/i, /\bwe will win\b/i];
 
@@ -21,7 +21,7 @@ const CASES = [
 
 async function run() {
   let pass = 0, fail = 0;
-  console.log(`\nOverturn eval — LLM ${process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'template mode'}\n`);
+  console.log(`\nOverturn eval — prompt ${PROMPT_VERSION} — LLM ${process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'template mode'}\n`);
   for (const c of CASES) {
     const cls = await classify(c.intake);
     const { letter, needsMedicalNecessity } = await draftAppeal(c.intake, cls);

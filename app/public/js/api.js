@@ -35,6 +35,16 @@ function home(role) {
   return { consumer: '/dashboard.html', provider: '/provider.html', pharma: '/pharma.html', employer: '/employer.html', clinician: '/clinician.html', admin: '/admin.html' }[role] || '/dashboard.html';
 }
 const LOGO = '<span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-8.5 9C7.5 19.5 4 17 4 12V6l8-3 8 3z" fill="none"/></svg></span>';
+// Optional privacy-friendly analytics — loads only if ANALYTICS_* env vars are set.
+(function () {
+  fetch('/api/public/config').then((r) => r.json()).then((c) => {
+    if (c && c.analyticsDomain && c.analyticsSrc) {
+      const s = document.createElement('script');
+      s.defer = true; s.setAttribute('data-domain', c.analyticsDomain); s.src = c.analyticsSrc;
+      document.head.appendChild(s);
+    }
+  }).catch(() => {});
+})();
 function navBar(u) {
   const links = { consumer: [['/dashboard.html', 'Dashboard'], ['/account.html', 'Account']], provider: [['/provider.html', 'Portal']], pharma: [['/pharma.html', 'Programs']], employer: [['/employer.html', 'Benefits']], clinician: [['/clinician.html', 'Review queue']], admin: [['/admin.html', 'Metrics']] }[u.role] || [];
   return `<header class="nav"><div class="container nav-inner">

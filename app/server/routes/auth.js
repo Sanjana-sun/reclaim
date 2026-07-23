@@ -1,7 +1,9 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { insert, findOne, update, remove } = require('../db');
 const { hash, verify, sign, requireAuth } = require('../auth');
+const { sendEmail } = require('../email');
 
 const ROLE_BY_CODE = { PHARMA: 'pharma', PROVIDER: 'provider', EMPLOYER: 'employer', CLINICIAN: 'clinician' };
 
@@ -29,6 +31,32 @@ router.post('/login', async (req, res, next) => {
     const user = await findOne('users', (u) => u.email.toLowerCase() === String(email || '').toLowerCase());
     if (!user || !verify(password || '', user.password_hash)) return res.status(401).json({ error: 'Invalid credentials' });
     res.json({ token: sign(user), user: safe(user) });
+  } catch (e) { next(e); }
+});
+
+// Forgot password: always returns ok (don't leak whether the email exists).
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const email = String((req.body || {}).email || '').toLowerCase();
+    const user = await findOne('users', (u) => u.email.toLowerCase() === email);
+    if (user) {
+      const token = crypto.randomBytes(24).toString('hex');
+      await update('users', user.id, { reset_token: token, reset_expires: Date.now() + 3600000 });
+      const link = `${process.env.APP_URL || ''}/reset.html?token=${token}`;
+      await sendEmail({ to: user.email, subject: 'Reset your Overturn password', text: `Reset your password (link valid 1 hour):\n${link}\n\nIf you didn't request this, ignore this email.` });
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const user = await findOne('users', (u) => u.reset_token && u.reset_token === token);
+    if (!user || !user.reset_expires || user.reset_expires < Date.now()) return res.status(400).json({ error: 'Invalid or expired reset link' });
+    await update('users', user.id, { password_hash: hash(newPassword), reset_token: null, reset_expires: null });
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

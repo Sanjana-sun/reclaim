@@ -1,8 +1,17 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { insert, find, findOne, update } = require('../db');
 const { requireAuth } = require('../auth');
-const { classify, draftAppeal, recordOutcome } = require('../algorithm');
+const { classify, draftAppeal, recordOutcome, parseDenial, externalReviewLetter } = require('../algorithm');
+
+// Extract intake fields from an uploaded denial letter (image/PDF as a data URL).
+router.post('/parse', requireAuth(['consumer']), async (req, res, next) => {
+  try {
+    const fields = await parseDenial((req.body || {}).file);
+    res.json({ extracted: fields });
+  } catch (e) { next(e); }
+});
 
 router.post('/', requireAuth(['consumer']), async (req, res, next) => {
   try {
@@ -73,6 +82,30 @@ router.post('/:id/outcome', requireAuth(['consumer']), async (req, res, next) =>
     const updated = await update('appeals', a.id, { status: outcome, amount_recovered: amount, outcome_at: new Date().toISOString() });
     await recordOutcome({ insurer: a.insurer, planType: a.plan_type, reason: a.reason, outcome });
     res.json({ appeal: updated });
+  } catch (e) { next(e); }
+});
+
+// After a lost internal appeal, request an independent external review.
+router.post('/:id/external-review', requireAuth(['consumer']), async (req, res, next) => {
+  try {
+    const a = await findOne('appeals', (x) => x.id === +req.params.id && x.user_id === req.user.id);
+    if (!a) return res.status(404).json({ error: 'Not found' });
+    if (a.status !== 'lost') return res.status(400).json({ error: 'External review is available after an internal appeal is denied' });
+    const deadline = new Date(Date.now() + 120 * 86400000).toISOString();
+    const updated = await update('appeals', a.id, { status: 'external_review', external_letter: externalReviewLetter(a), external_deadline: deadline });
+    res.json({ appeal: updated });
+  } catch (e) { next(e); }
+});
+
+// Generate a public, PII-free share link for a won appeal (the viral loop).
+router.post('/:id/share', requireAuth(['consumer']), async (req, res, next) => {
+  try {
+    const a = await findOne('appeals', (x) => x.id === +req.params.id && x.user_id === req.user.id);
+    if (!a) return res.status(404).json({ error: 'Not found' });
+    if (a.status !== 'won') return res.status(400).json({ error: 'You can share once an appeal is overturned' });
+    let token = a.share_token;
+    if (!token) { token = crypto.randomBytes(9).toString('hex'); await update('appeals', a.id, { share_token: token }); }
+    res.json({ token, url: `${req.body.origin || ''}/win.html?t=${token}` });
   } catch (e) { next(e); }
 });
 

@@ -1,6 +1,9 @@
 const { find, insert } = require('./db');
-const { callClaude, available } = require('./llm');
+const { callClaude, callVision, available } = require('./llm');
 const prompts = require('./prompts');
+const knowledge = require('./knowledge');
+
+const PROMPT_VERSION = 'v1';
 
 // ---------------------------------------------------------------------------
 // Reference data. Deadlines are owned by deterministic rules, never the model.
@@ -78,7 +81,7 @@ To the Appeals Department:
 I am writing to formally appeal your denial of coverage for ${subject}, and I request that you overturn this denial and cover the claim.
 
 ${REASON_ARG[cls.reason]}
-
+${knowledge.lookup(cls.reason) ? '\n' + knowledge.lookup(cls.reason).citation + '\n' : ''}
 ${intake.notes ? `Additional context:\n${intake.notes}\n` : ''}
 I request a full and fair review of this appeal, including review by an appropriately qualified professional. Please provide a written explanation of your decision and the specific plan provisions relied upon.
 
@@ -164,7 +167,45 @@ Prepared with Overturn, a self-help document tool. Not legal advice. You review,
 // 5. Win-rate data flywheel (deidentified — the compounding moat).
 // ---------------------------------------------------------------------------
 async function recordOutcome({ insurer, planType, reason, outcome }) {
-  await insert('winrate', { insurer, plan_type: planType, reason, outcome });
+  await insert('winrate', { insurer, plan_type: planType, reason, outcome, prompt_version: PROMPT_VERSION });
+}
+
+// Extract intake fields from a photo/PDF of a denial letter (Claude vision; null if no key).
+async function parseDenial(dataUrl) {
+  if (!available() || !dataUrl) return null;
+  const m = /^data:([^;]+);base64,(.+)$/s.exec(dataUrl);
+  if (!m) return null;
+  const out = await callVision({
+    mediaType: m[1], base64: m[2],
+    system: 'You extract structured fields from a US health-insurance denial letter. Output ONLY JSON.',
+    prompt: `Return JSON with keys: insurer (string), plan (one of commercial|aca|ma|erisa or ""), reason (one of ${VALID_REASONS.join('|')} or ""), service (string), drug (string), notes (short summary string). Use "" if unknown.`,
+  });
+  if (!out) return null;
+  try { const j = out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1); return JSON.parse(j); } catch (e) { return null; }
+}
+
+function externalReviewLetter(appeal) {
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return `${today}
+
+Independent Review Organization / State External Review
+Re: Request for external review — ${appeal.service || '[service]'}${appeal.drug ? ` (${appeal.drug})` : ''}
+Plan: ${appeal.insurer || '[Insurer]'}   Member: [Your name]   Claim #: [claim number]
+
+To the Independent Reviewer:
+
+My internal appeal for the above service was denied. I am requesting an independent external
+review of that decision. The service is appropriate and covered for the reasons documented in my
+internal appeal and my treating physician's records, which are attached.
+
+I request that the denial be overturned and the claim paid.
+
+Sincerely,
+[Your signature]
+[Your name]
+
+---
+Prepared with Overturn, a self-help document tool. Not legal or medical advice. You review, sign, and submit this request yourself.`;
 }
 
 async function winStats() {
@@ -183,4 +224,4 @@ async function winStats() {
   return { overall, total: rows.length, byInsurer: by((r) => r.insurer), byReason: by((r) => r.reason) };
 }
 
-module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, DEADLINES };
+module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, parseDenial, externalReviewLetter, PROMPT_VERSION, DEADLINES };

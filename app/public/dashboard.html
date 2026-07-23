@@ -11,6 +11,11 @@
     </div>
     <div class="card">
       <h2 style="margin-top:0;">New appeal</h2>
+      <label>Upload your denial letter <span class="muted">(optional — auto-fills the form)</span></label>
+      <input type="file" id="denialFile" accept="image/*,application/pdf">
+      <button class="small ghost" style="margin-top:8px;" onclick="parseDenial()">Auto-fill from letter</button>
+      <div id="parseMsg" class="muted" style="margin-top:6px;font-size:13px;"></div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:18px 0;">
       <div class="row">
         <div><label>Insurer</label><input id="insurer" placeholder="UnitedHealthcare"></div>
         <div><label>Plan type</label><select id="plan"><option value="commercial">Commercial / employer</option><option value="aca">ACA marketplace</option><option value="ma">Medicare Advantage</option><option value="erisa">Self-funded (ERISA)</option></select></div>
@@ -107,9 +112,30 @@ async function stripePay(clientSecret){
 }
 async function submitAppeal(id){ await OT.api('/appeals/'+id+'/submit',{method:'POST'}); document.getElementById('afterSubmit_'+id).innerHTML='<div class="flag">Submitted. When you hear back, record the outcome below so we learn.</div><div style="display:flex;gap:8px;"><button class="small" onclick="outcome('+id+',\\'won\\')">It was overturned 🎉</button><button class="small ghost" onclick="outcome('+id+',\\'lost\\')">Denied again</button></div>'; loadAppeals(); }
 async function outcome(id,o){ let amt=0; if(o==='won'){ amt=prompt('Roughly how much was covered/recovered? ($)','0'); } await OT.api('/appeals/'+id+'/outcome',{method:'POST',body:{outcome:o,amountRecovered:Number(amt)||0}}); loadAppeals(); }
+async function parseDenial(){
+  const f=document.getElementById('denialFile').files[0]; const msg=document.getElementById('parseMsg');
+  if(!f){ msg.textContent='Choose a file first.'; return; }
+  msg.textContent='Reading your letter…';
+  const dataUrl=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
+  try{ const {extracted}=await OT.api('/appeals/parse',{method:'POST',body:{file:dataUrl}});
+    if(!extracted){ msg.textContent='Automatic reading needs AI enabled — please fill the form manually.'; return; }
+    const set=(id,val)=>{ if(val) document.getElementById(id).value=val; };
+    set('insurer',extracted.insurer); set('plan',extracted.plan); set('reason',extracted.reason);
+    set('service',extracted.service); set('drug',extracted.drug); set('notes',extracted.notes);
+    msg.textContent='Filled from your letter — please review and adjust before generating.';
+  }catch(e){ msg.textContent=e.message; }
+}
+async function shareAppeal(id){ const {url}=await OT.api('/appeals/'+id+'/share',{method:'POST',body:{origin:location.origin}}); try{await navigator.clipboard.writeText(url);}catch(e){} OT.toast('Share link copied'); }
+async function requestExternal(id){ await OT.api('/appeals/'+id+'/external-review',{method:'POST'}); OT.toast('External-review letter ready'); loadAppeals(); }
 async function loadAppeals(){ const {appeals}=await OT.api('/appeals'); const el=document.getElementById('appealList');
   if(!appeals.length){ el.innerHTML='<p class="muted">No appeals yet.</p>'; return; }
-  el.innerHTML='<table><tr><th>Service</th><th>Insurer</th><th>Status</th><th>Deadline</th><th>Recovered</th></tr>'+appeals.map(a=>`<tr><td>${OT.esc(a.service||'—')}</td><td>${OT.esc(a.insurer||'—')}</td><td><span class="badge ${a.status==='won'?'':a.status==='lost'?'gray':'warn'}">${a.status}</span></td><td>${new Date(a.deadline).toLocaleDateString()}</td><td>${a.amount_recovered?OT.money(a.amount_recovered):'—'}</td></tr>`).join('')+'</table>';
+  el.innerHTML='<table><tr><th>Service</th><th>Insurer</th><th>Status</th><th>Deadline</th><th>Recovered</th><th></th></tr>'+appeals.map(a=>{
+    let act='';
+    if(a.status==='won') act=`<button class="small" onclick="shareAppeal(${a.id})">Share win</button>`;
+    else if(a.status==='lost') act=`<button class="small ghost" onclick="requestExternal(${a.id})">External review</button>`;
+    else if(a.status==='external_review') act=`<span class="badge">external review</span>`;
+    return `<tr><td>${OT.esc(a.service||'—')}</td><td>${OT.esc(a.insurer||'—')}</td><td><span class="badge ${a.status==='won'?'ok':a.status==='lost'?'gray':'warn'}">${OT.esc(a.status)}</span></td><td>${new Date(a.deadline).toLocaleDateString()}</td><td>${a.amount_recovered?OT.money(a.amount_recovered):'—'}</td><td>${act}</td></tr>`;
+  }).join('')+'</table>';
 }
 
 document.getElementById('billBtn').addEventListener('click', async ()=>{

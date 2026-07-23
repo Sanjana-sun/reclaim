@@ -1,0 +1,26 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reset password — Overturn</title><link rel="stylesheet" href="css/app.css"></head><body>
+<header class="nav"><div class="container nav-inner"><a class="brand" href="/"><span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-8.5 9C7.5 19.5 4 17 4 12V6l8-3 8 3z"/></svg></span>Over<b>turn</b></a></div></header>
+<div class="wrap narrow" style="max-width:440px;">
+  <h1>Set a new password</h1>
+  <div class="card">
+    <div id="err" class="err hide"></div>
+    <div id="form">
+      <label>New password</label><input id="pw" type="password" placeholder="At least 6 characters">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="reset()">Update password</button>
+    </div>
+    <div id="done" class="hide"><p>Password updated. <a href="/login.html">Sign in →</a></p></div>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const token=new URLSearchParams(location.search).get('token');
+if(!token){ document.getElementById('form').classList.add('hide'); document.getElementById('err').textContent='Missing or invalid reset link.'; document.getElementById('err').classList.remove('hide'); }
+async function reset(){
+  document.getElementById('err').classList.add('hide');
+  try{ await OT.api('/auth/reset-password',{method:'POST',body:{token,newPassword:document.getElementById('pw').value}});
+    document.getElementById('form').classList.add('hide'); document.getElementById('done').classList.remove('hide'); }
+  catch(e){ const el=document.getElementById('err'); el.textContent=e.message; el.classList.remove('hide'); }
+}
+</script>
+</body></html>
