@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard.html
+Disallow: /account.html
+Disallow: /admin.html
+Disallow: /provider.html
+Disallow: /pharma.html
+Disallow: /employer.html
+Disallow: /clinician.html
+
+Sitemap: https://overturn-production.up.railway.app/sitemap.xml

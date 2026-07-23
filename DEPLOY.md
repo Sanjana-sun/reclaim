@@ -73,6 +73,16 @@ Local webhook testing: `stripe listen --forward-to localhost:3000/api/billing/we
 
 ---
 
+## Production hardening
+Set these so the seeded demo logins don't exist in production:
+```
+SEED_DEMO=false
+ADMIN_EMAIL=you@yourdomain.com
+ADMIN_PASSWORD=<a strong password>
+```
+Org codes (PROVIDER/PHARMA/EMPLOYER/CLINICIAN) still work for team signup; only the
+known-password demo accounts are removed. Also set `APP_URL` so emails/share links are absolute.
+
 ## Post-deploy checklist
 
 - [ ] `GET /api/health` returns `{"backend":"pg", ...}`

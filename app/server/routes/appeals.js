@@ -32,7 +32,7 @@ router.post('/', requireAuth(['consumer']), async (req, res, next) => {
 
     const deadline = new Date(Date.now() + cls.deadlineDays * 86400000).toISOString();
     const appeal = await insert('appeals', {
-      user_id: req.user.id, insurer, plan_type: cls.planType, reason: cls.reason, service, drug: drug || null,
+      user_id: req.user.id, vertical: cls.vertical, insurer, plan_type: cls.planType, reason: cls.reason, service, drug: drug || null,
       notes: notes || null, letter, status: 'draft', deadline, deadline_text: cls.deadlineText,
       needs_medical_necessity: needsMedicalNecessity, sponsor_org_id: sponsor ? sponsor.org_id : null,
       sponsor_rate: sponsor ? sponsor.rate : null, provider_org_id, amount_recovered: 0, paid: !!sponsor,
@@ -80,7 +80,7 @@ router.post('/:id/outcome', requireAuth(['consumer']), async (req, res, next) =>
     const outcome = req.body.outcome === 'won' ? 'won' : 'lost';
     const amount = outcome === 'won' ? (Number(req.body.amountRecovered) || 0) : 0;
     const updated = await update('appeals', a.id, { status: outcome, amount_recovered: amount, outcome_at: new Date().toISOString() });
-    await recordOutcome({ insurer: a.insurer, planType: a.plan_type, reason: a.reason, outcome });
+    await recordOutcome({ insurer: a.insurer, planType: a.plan_type, reason: a.reason, outcome, vertical: a.vertical });
     res.json({ appeal: updated });
   } catch (e) { next(e); }
 });

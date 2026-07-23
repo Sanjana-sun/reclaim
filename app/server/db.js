@@ -76,11 +76,23 @@ async function init() {
 }
 
 async function seed() {
-  await insert('users', { email: 'admin@overturn.dev', password_hash: bcrypt.hashSync('admin123', 8), role: 'admin', org_id: null, name: 'Admin' });
+  const demo = process.env.SEED_DEMO !== 'false';
+
+  // Admin: prefer real env credentials; fall back to the demo admin only in demo mode.
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+    await insert('users', { email: process.env.ADMIN_EMAIL, password_hash: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 8), role: 'admin', org_id: null, name: 'Admin' });
+  } else if (demo) {
+    await insert('users', { email: 'admin@overturn.dev', password_hash: bcrypt.hashSync('admin123', 8), role: 'admin', org_id: null, name: 'Admin' });
+  }
+
+  // Orgs are always seeded — they carry no secrets and provide the signup org codes.
   const pharma = await insert('orgs', { name: 'NovoMed Pharma', type: 'pharma', code: 'PHARMA', meta: { sponsored_programs: [{ drug: 'Ozempic', budget: 500000, spent: 0, rate: 75 }, { drug: 'Wegovy', budget: 300000, spent: 0, rate: 75 }] } });
   const provider = await insert('orgs', { name: 'Cascade Orthopedics', type: 'provider', code: 'PROVIDER', meta: { acv: 15000, specialty: 'orthopedics' } });
   const employer = await insert('orgs', { name: 'Acme Corp', type: 'employer', code: 'EMPLOYER', meta: { covered_lives: 4200, pmpm: 0.5 } });
   const clinicOrg = await insert('orgs', { name: 'Overturn Clinical Review', type: 'clinician', code: 'CLINICIAN', meta: {} });
+
+  // Demo staff/patient accounts and sample data only when SEED_DEMO is not 'false'.
+  if (!demo) return;
   await insert('users', { email: 'pharma@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'pharma', org_id: pharma.id, name: 'Pharma Manager' });
   await insert('users', { email: 'provider@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'provider', org_id: provider.id, name: 'Clinic Admin' });
   await insert('users', { email: 'employer@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'employer', org_id: employer.id, name: 'HR Benefits' });

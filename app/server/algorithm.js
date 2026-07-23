@@ -1,55 +1,35 @@
 const { find, insert } = require('./db');
 const { callClaude, callVision, available } = require('./llm');
 const prompts = require('./prompts');
-const knowledge = require('./knowledge');
+const verticals = require('./verticals');
 
 const PROMPT_VERSION = 'v1';
 
 // ---------------------------------------------------------------------------
-// Reference data. Deadlines are owned by deterministic rules, never the model.
-// ---------------------------------------------------------------------------
-const DEADLINES = {
-  commercial: { days: 180, text: 'Generally 180 days from the denial to file an internal appeal. Confirm the exact date on your denial letter.' },
-  aca: { days: 180, text: '180 days to file an internal appeal; external review available afterward.' },
-  ma: { days: 65, text: 'Medicare Advantage: generally 65 days to file a reconsideration. These are overturned at a high rate.' },
-  erisa: { days: 180, text: 'Self-funded (ERISA) plans: typically 180 days. Deadlines are strict — file early.' },
-};
-
-const REASON_ARG = {
-  medical_necessity: 'This service is medically necessary. My treating physician has determined it is required to diagnose or treat my condition, consistent with generally accepted standards of care and the plan\'s own medical policy. My physician\'s statement of medical necessity and supporting records are attached.',
-  prior_auth: 'The prior-authorization requirement should not bar payment here. Please review the claim on its clinical merits, taking into account the circumstances described below.',
-  experimental: 'This treatment is not experimental or investigational for my condition. It is supported by published clinical guidelines and standard medical practice, as documented by my physician in the attached materials.',
-  out_of_network: 'Network-adequacy and continuity-of-care protections apply. Please reprocess the claim at the in-network rate given the circumstances described below.',
-  not_covered: 'This service should be covered under the terms of my plan. Please identify the specific plan language relied on to deny it and reconsider in light of the attached documentation.',
-  step_therapy: 'A step-therapy exception is warranted. My physician supports this exception for the reasons described below and in the attached letter.',
-  coding: 'This appears to be a coding or billing error. Please review the coding on the attached itemized statement and reprocess the claim correctly.',
-};
-
-const MN_REASONS = ['medical_necessity', 'experimental', 'step_therapy'];
-const VALID_REASONS = Object.keys(REASON_ARG);
-
-// ---------------------------------------------------------------------------
 // 1. Classifier — rules first; optional LLM refinement of free text.
+// Vertical-specific reasons/deadlines come from the vertical registry.
 // ---------------------------------------------------------------------------
 async function classify(intake) {
-  let reason = VALID_REASONS.includes(intake.reason) ? intake.reason : 'medical_necessity';
-  const planType = DEADLINES[intake.plan] ? intake.plan : 'commercial';
+  const vertical = verticals.getVertical(intake.vertical).key;
+  const valid = verticals.validReasons(vertical);
+  let reason = valid.includes(intake.reason) ? intake.reason : valid[0];
+  const planType = verticals.getVertical(vertical).deadlines[intake.plan] ? intake.plan : 'commercial';
 
   if (available() && intake.notes && intake.notes.length > 20) {
     const out = await callClaude({
       model: process.env.CLASSIFY_MODEL,
       maxTokens: 20,
-      system: prompts.classifySystem(VALID_REASONS),
+      system: prompts.classifySystem(valid),
       user: `Stated reason: ${intake.reason}; service: ${intake.service}; notes: ${intake.notes}`,
     });
-    if (out) { const guess = out.trim().toLowerCase().replace(/[^a-z_]/g, ''); if (VALID_REASONS.includes(guess)) reason = guess; }
+    if (out) { const guess = out.trim().toLowerCase().replace(/[^a-z_]/g, ''); if (valid.includes(guess)) reason = guess; }
   }
 
-  const d = DEADLINES[planType];
+  const d = verticals.deadline(vertical, planType);
   return {
-    reason, planType,
+    reason, planType, vertical,
     deadlineDays: d.days, deadlineText: d.text,
-    needsMedicalNecessity: MN_REASONS.includes(reason),
+    needsMedicalNecessity: verticals.isMedicalNecessity(vertical, reason),
   };
 }
 
@@ -80,8 +60,8 @@ To the Appeals Department:
 
 I am writing to formally appeal your denial of coverage for ${subject}, and I request that you overturn this denial and cover the claim.
 
-${REASON_ARG[cls.reason]}
-${knowledge.lookup(cls.reason) ? '\n' + knowledge.lookup(cls.reason).citation + '\n' : ''}
+${verticals.reasonArg(cls.vertical, cls.reason)}
+${verticals.citation(cls.vertical, cls.reason) ? '\n' + verticals.citation(cls.vertical, cls.reason) + '\n' : ''}
 ${intake.notes ? `Additional context:\n${intake.notes}\n` : ''}
 I request a full and fair review of this appeal, including review by an appropriately qualified professional. Please provide a written explanation of your decision and the specific plan provisions relied upon.
 
@@ -166,8 +146,8 @@ Prepared with Overturn, a self-help document tool. Not legal advice. You review,
 // ---------------------------------------------------------------------------
 // 5. Win-rate data flywheel (deidentified — the compounding moat).
 // ---------------------------------------------------------------------------
-async function recordOutcome({ insurer, planType, reason, outcome }) {
-  await insert('winrate', { insurer, plan_type: planType, reason, outcome, prompt_version: PROMPT_VERSION });
+async function recordOutcome({ insurer, planType, reason, outcome, vertical }) {
+  await insert('winrate', { insurer, plan_type: planType, reason, outcome, vertical: vertical || 'health', prompt_version: PROMPT_VERSION });
 }
 
 // Extract intake fields from a photo/PDF of a denial letter (Claude vision; null if no key).
@@ -178,7 +158,7 @@ async function parseDenial(dataUrl) {
   const out = await callVision({
     mediaType: m[1], base64: m[2],
     system: 'You extract structured fields from a US health-insurance denial letter. Output ONLY JSON.',
-    prompt: `Return JSON with keys: insurer (string), plan (one of commercial|aca|ma|erisa or ""), reason (one of ${VALID_REASONS.join('|')} or ""), service (string), drug (string), notes (short summary string). Use "" if unknown.`,
+    prompt: `Return JSON with keys: insurer (string), plan (one of commercial|aca|ma|erisa or ""), reason (one of ${verticals.validReasons('health').join('|')} or ""), service (string), drug (string), notes (short summary string). Use "" if unknown.`,
   });
   if (!out) return null;
   try { const j = out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1); return JSON.parse(j); } catch (e) { return null; }
@@ -224,4 +204,4 @@ async function winStats() {
   return { overall, total: rows.length, byInsurer: by((r) => r.insurer), byReason: by((r) => r.reason) };
 }
 
-module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, parseDenial, externalReviewLetter, PROMPT_VERSION, DEADLINES };
+module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, parseDenial, externalReviewLetter, PROMPT_VERSION };
