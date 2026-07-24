@@ -15,7 +15,9 @@ function retrieve({ reason, planType, state, denialCode, service, notes } = {}) 
   // State rights apply to fully-insured plans (not self-funded/ERISA).
   const stateRights = (planType !== 'erisa' && state && STATES[state]) ? STATES[state] : [];
 
-  const code = denialCode ? CARC[String(denialCode).replace(/[^0-9]/g, '')] : null;
+  // Normalize e.g. "CO-197" -> "197", "B7" -> "B7", strip group-code prefixes and separators.
+  const key = denialCode ? String(denialCode).toUpperCase().replace(/^(CO|PR|OA|PI|CR)[-\s]?/, '').replace(/[^0-9A-Z]/g, '') : '';
+  const code = key ? CARC[key] : null;
 
   const rights = [...federal, ...stateRights].map((r) => ({ id: r.id, title: r.title, summary: r.summary, citation: r.citation }));
   const evidence = uniq([...federal, ...stateRights].flatMap((r) => r.evidence || []));
