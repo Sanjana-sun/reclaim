@@ -2,6 +2,7 @@ const { find, insert } = require('./db');
 const { callClaude, callVision, available } = require('./llm');
 const prompts = require('./prompts');
 const verticals = require('./verticals');
+const legal = require('./legal');
 
 const PROMPT_VERSION = 'v1';
 
@@ -28,6 +29,7 @@ async function classify(intake) {
   const d = verticals.deadline(vertical, planType);
   return {
     reason, planType, vertical,
+    state: intake.state || null, denialCode: intake.denialCode || null,
     deadlineDays: d.days, deadlineText: d.text,
     needsMedicalNecessity: verticals.isMedicalNecessity(vertical, reason),
   };
@@ -37,17 +39,28 @@ async function classify(intake) {
 // 2. Drafter — Claude if available, else template. Always run through linter.
 // ---------------------------------------------------------------------------
 async function draftAppeal(intake, cls) {
+  const ctx = legal.retrieve({ reason: cls.reason, planType: cls.planType, state: cls.state, denialCode: cls.denialCode, service: intake.service, notes: intake.notes });
   let letter = null;
   if (available()) {
-    letter = await callClaude({ system: prompts.DRAFT_SYSTEM, user: prompts.draftUser(intake, cls), maxTokens: 1400 });
+    const user = prompts.draftUser(intake, cls) + rightsPromptBlock(ctx);
+    letter = await callClaude({ system: prompts.DRAFT_SYSTEM, user, maxTokens: 1500 });
   }
-  if (!letter) letter = templateLetter(intake, cls);
-  return lint(letter, cls);
+  if (!letter) letter = templateLetter(intake, cls, ctx);
+  const linted = lint(letter, cls);
+  return { ...linted, rights: ctx.rights, evidence: ctx.evidence, codeGuidance: ctx.codeGuidance };
 }
 
-function templateLetter(intake, cls) {
+function rightsPromptBlock(ctx) {
+  if (!ctx.rights.length) return '';
+  return '\n\nCite these applicable rights ACCURATELY (do not overstate or invent law):\n' + ctx.rights.map((r) => `- ${r.title} (${r.citation})`).join('\n');
+}
+
+function templateLetter(intake, cls, ctx) {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const subject = (intake.service || '[service]') + (intake.drug ? ` (${intake.drug})` : '');
+  const legalBasis = ctx && ctx.rights && ctx.rights.length
+    ? '\nApplicable rights:\n' + ctx.rights.map((r) => `  • ${r.title} — ${r.citation}`).join('\n') + '\n'
+    : '';
   return `${today}
 
 ${intake.insurer || '[Insurer]'}
@@ -62,7 +75,7 @@ I am writing to formally appeal your denial of coverage for ${subject}, and I re
 
 ${verticals.reasonArg(cls.vertical, cls.reason)}
 ${verticals.citation(cls.vertical, cls.reason) ? '\n' + verticals.citation(cls.vertical, cls.reason) + '\n' : ''}
-${intake.notes ? `Additional context:\n${intake.notes}\n` : ''}
+${intake.notes ? `Additional context:\n${intake.notes}\n` : ''}${legalBasis}
 I request a full and fair review of this appeal, including review by an appropriately qualified professional. Please provide a written explanation of your decision and the specific plan provisions relied upon.
 
 Attached: (1) the denial letter, (2) my physician's supporting documentation, and (3) relevant medical records.

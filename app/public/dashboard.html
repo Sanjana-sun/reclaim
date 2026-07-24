@@ -23,6 +23,7 @@
       <label>Denial reason</label>
       <select id="reason"><option value="medical_necessity">Not medically necessary</option><option value="prior_auth">No prior authorization</option><option value="experimental">Experimental / investigational</option><option value="out_of_network">Out of network</option><option value="not_covered">Not a covered benefit</option><option value="step_therapy">Step therapy required</option><option value="coding">Coding / billing error</option></select>
       <div class="row"><div><label>Service / treatment</label><input id="service" placeholder="MRI of left knee"></div><div><label>Medication (if any)</label><input id="drug" placeholder="Ozempic"></div></div>
+      <div class="row"><div><label>Your state <span class="muted">(applies your state's rights)</span></label><select id="state"><option value="">Select…</option></select></div><div><label>Denial code <span class="muted">(optional, from your EOB)</span></label><input id="denialCode" placeholder="e.g. 50 or CO-197"></div></div>
       <label>Your situation (in your words)</label><textarea id="notes" placeholder="My doctor says I need this because…"></textarea>
       <label>Clinic code <span class="muted">(optional)</span></label><input id="providerCode" placeholder="e.g. PROVIDER">
       <div class="disc">Self-help tool — not a law firm or medical provider. You sign and submit. No outcome guarantee.</div>
@@ -58,7 +59,7 @@ const err=(id,e)=>{const el=document.getElementById(id);el.textContent=e;el.clas
 
 document.getElementById('genBtn').addEventListener('click', async ()=>{
   document.getElementById('genErr').classList.add('hide');
-  const body={insurer:v('insurer'),plan:v('plan'),reason:v('reason'),service:v('service'),drug:v('drug'),notes:v('notes'),providerCode:v('providerCode')};
+  const body={insurer:v('insurer'),plan:v('plan'),reason:v('reason'),service:v('service'),drug:v('drug'),notes:v('notes'),providerCode:v('providerCode'),state:v('state'),denialCode:v('denialCode')};
   try{ const {appeal,sponsored}=await OT.api('/appeals',{method:'POST',body}); renderAppeal(appeal,sponsored); loadAppeals(); }
   catch(e){ err('genErr',e.message); }
 });
@@ -70,6 +71,10 @@ function renderAppeal(a,sponsored){
     ${a.review_status==='pending'?'<div class="flag">In our clinical-review queue for a quality check on the medical-necessity framing.</div>':''}
     ${a.review_status==='approved'?'<div class="flag"><b>Clinician-reviewed.</b> A licensed reviewer confirmed the medical-necessity framing'+(a.reviewer_note?': '+OT.esc(a.reviewer_note):'.')+'</div>':''}
     ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\\'s free to you.</div>':''}
+    ${(a.rights&&a.rights.length)?`<div style="margin:14px 0;"><b>Rights cited in your appeal</b><ul style="margin:8px 0 0;padding-left:18px;">${a.rights.map(r=>`<li style="margin:4px 0;"><b>${OT.esc(r.title)}</b> <span class="muted">— ${OT.esc(r.citation)}</span></li>`).join('')}</ul></div>`:''}
+    ${(a.evidence&&a.evidence.length)?`<div class="flag"><b>Evidence to gather &amp; attach:</b><ul style="margin:8px 0 0;padding-left:18px;">${a.evidence.map(e=>`<li style="margin:3px 0;">${OT.esc(e)}</li>`).join('')}</ul></div>`:''}
+    ${a.code_guidance?`<div class="flag warn"><b>Denial code:</b> ${OT.esc(a.code_guidance.note)}</div>`:''}
+    <div class="disc">Rights shown are general information, not legal advice, and may vary by plan/state — verify before relying on them.</div>
     <div class="letter" id="letterBox" contenteditable="true">${OT.esc(a.letter)}</div>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
       <button class="small" onclick="saveLetter(${a.id})">Save edits</button>
@@ -170,7 +175,8 @@ async function upgrade(){
   OT.toast('You\'re on Plus 🎉'); document.getElementById('upgradeBanner').classList.add('hide');
 }
 if(new URLSearchParams(location.search).get('sub')==='success') OT.toast('Subscription active — welcome to Plus!');
+async function loadStates(){ try{ const {states}=await OT.api('/public/states'); const sel=document.getElementById('state'); states.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); }); }catch(e){} }
 function v(id){return document.getElementById(id).value.trim();}
-loadAppeals(); loadBills(); checkSub();
+loadAppeals(); loadBills(); checkSub(); loadStates();
 </script>
 </body></html>

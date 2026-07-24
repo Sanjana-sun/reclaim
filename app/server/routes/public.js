@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { findOne } = require('../db');
+const legal = require('../legal');
+
+router.get('/states', (req, res) => res.json({ states: legal.listStates() }));
 
 // PII-free "win" data for a shared appeal (the viral share loop).
 router.get('/win/:token', async (req, res, next) => {

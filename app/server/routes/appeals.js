@@ -15,10 +15,10 @@ router.post('/parse', requireAuth(['consumer']), async (req, res, next) => {
 
 router.post('/', requireAuth(['consumer']), async (req, res, next) => {
   try {
-    const { insurer, plan, reason, service, drug, notes, providerCode } = req.body || {};
-    const intake = { insurer, plan, reason, service, drug, notes };
+    const { insurer, plan, reason, service, drug, notes, providerCode, state, denialCode } = req.body || {};
+    const intake = { insurer, plan, reason, service, drug, notes, state, denialCode };
     const cls = await classify(intake);
-    const { letter, needsMedicalNecessity } = await draftAppeal(intake, cls);
+    const { letter, needsMedicalNecessity, rights, evidence, codeGuidance } = await draftAppeal(intake, cls);
 
     let sponsor = null;
     if (drug) {
@@ -33,7 +33,8 @@ router.post('/', requireAuth(['consumer']), async (req, res, next) => {
     const deadline = new Date(Date.now() + cls.deadlineDays * 86400000).toISOString();
     const appeal = await insert('appeals', {
       user_id: req.user.id, vertical: cls.vertical, insurer, plan_type: cls.planType, reason: cls.reason, service, drug: drug || null,
-      notes: notes || null, letter, status: 'draft', deadline, deadline_text: cls.deadlineText,
+      state: state || null, denial_code: denialCode || null, notes: notes || null, letter, status: 'draft',
+      deadline, deadline_text: cls.deadlineText, rights: rights || [], evidence: evidence || [], code_guidance: codeGuidance || null,
       needs_medical_necessity: needsMedicalNecessity, sponsor_org_id: sponsor ? sponsor.org_id : null,
       sponsor_rate: sponsor ? sponsor.rate : null, provider_org_id, amount_recovered: 0, paid: !!sponsor,
       review_status: needsMedicalNecessity ? 'pending' : 'not_required', reviewer_note: null,
