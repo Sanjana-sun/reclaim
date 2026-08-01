@@ -1,110 +1,58 @@
-<div align="center">
+# Overturn
 
-# 🛡️ Overturn
+AI that helps patients fight denied insurance claims and dispute wrong medical bills: it drafts a plan specific, citation backed appeal, and you review, sign, and send.
 
-**AI that helps patients fight denied insurance claims and dispute wrong medical bills — you review, sign, and send.**
 
-[![CI](https://github.com/Sanjana-sun/overturn/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanjana-sun/overturn/actions/workflows/ci.yml)
-![Node](https://img.shields.io/badge/node-20%2B-3c873a)
-![Express](https://img.shields.io/badge/server-Express-000000)
-![Postgres](https://img.shields.io/badge/db-JSON%20%7C%20Postgres-336791)
-![Stripe](https://img.shields.io/badge/payments-Stripe-635bff)
-![License](https://img.shields.io/badge/license-Proprietary-lightgrey)
+## Why it exists
 
-</div>
+Fewer than 1% of US insurance denials are ever appealed, yet a large share of appeals win and most denials trace back to paperwork errors, not real coverage disputes. Meanwhile billions in medical debt sit on top of duplicate and upcoded charges. Overturn turns a citation backed appeal into a five minute act and puts it in patients' hands as a self help tool: not a law firm, not medical advice, you stay in control of what gets sent.
 
----
+## Tech stack
 
-## Why
+Node.js and Express backend, PostgreSQL (with a JSON store fallback for zero config local runs), JWT and bcrypt auth, the Claude API for classification and drafting with template fallback, Stripe for PaymentIntents and billing, and a vanilla JS frontend on a hand built design system. GitHub Actions CI.
 
-Fewer than 1% of insurance denials are ever appealed — yet **44–60% of appeals win**, and ~77% of
-denials are paperwork errors. Meanwhile ~$220B in US medical debt sits partly on **wrong bills**.
-AI just made a citation-backed appeal a 5-minute, near-zero-cost act. Overturn puts that in
-patients' hands as a **self-help tool** (not a law firm, not medical advice — you sign and send).
+## Features
 
-## What it does — three revenue engines
-
-| Engine | For the user | How it earns |
-|---|---|---|
-| **Appeals** | Draft a plan-specific appeal for a denied claim | $40/appeal or $12/mo Plus |
-| **Bill disputes** | Detect duplicate/upcoded/over-benchmark charges, draft the dispute | 25% of realized savings |
-| **B2B2C** | Sponsored appeals + clinic/employer portals | Pharma programs · provider ACV · employer PMPM |
-
-Five role portals (patient, provider, pharma, employer, admin) **plus a clinician-review queue**,
-and a full marketing site.
+- **Appeal drafting:** classify a denial reason, then draft a plan specific appeal letter with the right framing (medical necessity, step therapy exception, out of network in network rate, and more).
+- **Bill dispute detection:** scan an itemized bill for duplicate, upcoded, and over benchmark charges, estimate savings, and draft the dispute.
+- **Document extraction:** a Claude vision path reads uploaded PDFs and images of denials and bills into structured fields.
+- **Five role based portals:** patient, provider, pharma, employer, and admin, plus a clinician review queue.
+- **Stripe payments:** per appeal charges and subscription billing with signed webhooks.
+- **Safety guardrails:** every generated letter passes a linter that bans overreaching phrases (no guarantees, no "robot lawyer", no "we will win") and enforces the self help disclaimer and filing deadline.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Clients
-    C[Patients]:::c
-    B[Provider / Pharma / Employer]:::c
-    Cl[Clinicians]:::c
-    A[Admin]:::c
-  end
-  Clients --> W[Express server<br/>static site + REST API]
-  W --> ALG[Algorithm<br/>classify · draft · lint · bill-detect · win-rate]
-  ALG --> LLM[Claude API<br/>fallback: templates]
-  W --> DB[(JSON | Postgres)]
-  W --> STR[Stripe<br/>PaymentIntents + Billing]
-  classDef c fill:#e5f3ee,stroke:#0f7b5f,color:#08503f;
-```
+Concrete numbers:
 
-Every integration is **feature-flagged** — the app runs with zero config and lights up as you add
-`ANTHROPIC_API_KEY`, `DATABASE_URL`, and `STRIPE_*`.
+- **43 REST endpoints across 9 route modules:** `auth`, `appeals`, `bills`, `billing`, `org`, `clinician`, `public`, `admin`, and a Stripe `webhook`.
+- **Roughly 1,400 lines** of Node and Express server code.
+- Every external integration is **feature flagged**: the app boots with zero config and lights up as you add `ANTHROPIC_API_KEY`, `DATABASE_URL`, and the `STRIPE_*` keys.
 
-## Quickstart
+### The Claude pipeline
+
+The core logic in `app/server/algorithm.js` (prompts in `app/server/prompts.js`, Claude wrapper in `app/server/llm.js`) runs a three stage pass:
+
+1. **Classify** the denial into a reason category and attach the filing deadline.
+2. **Draft** the appeal letter for that reason, flagging when a medical necessity argument is required.
+3. **Extract** structured billing errors from itemized charges and estimate recoverable savings.
+
+Claude failures return null and the pipeline falls back to deterministic templates, so the product still works without an API key.
+
+### Automated eval harness
+
+`app/eval/run.js` runs the drafter and bill detector against a fixed suite of denial scenarios and asserts required content, banned phrases, the disclaimer, deadlines, and duplicate detection. It runs in template mode with no key, or validates real Claude output the same way when a key is present, and exits non zero on any failure. Wired into CI as `npm run eval`.
+
+## Running locally
 
 ```bash
 cd app
 npm install
 npm start          # http://localhost:3000
-npm run eval       # guardrail + bill-detector tests (6/6)
+npm run eval       # guardrail + bill-detector tests
 ```
 
-### Demo accounts (seeded on first run)
+Seeded demo accounts (patient, provider, pharma, employer, clinician, admin) are created on first run; see the app README for logins. Deployment configs for Railway, Fly, Render, and Docker are included.
 
-| Role | Email | Password |
-|---|---|---|
-| Patient | `patient@overturn.dev` | `demo1234` |
-| Provider | `provider@overturn.dev` | `demo1234` |
-| Pharma | `pharma@overturn.dev` | `demo1234` |
-| Employer | `employer@overturn.dev` | `demo1234` |
-| Clinician | `clinician@overturn.dev` | `demo1234` |
-| Admin | `admin@overturn.dev` | `admin123` |
+## Status and disclaimers
 
-Sign up as a patient with no code, or use org codes `PROVIDER` / `PHARMA` / `EMPLOYER` / `CLINICIAN`.
-
-## Tech stack
-
-Node/Express · dual **JSON | Postgres** store (auto-migrated) · JWT + bcrypt auth ·
-**Claude** (Opus draft / Haiku classify) with template fallback · **Stripe** PaymentIntents +
-Billing + signed webhooks · vanilla-JS frontend on a hand-built design system · GitHub Actions CI.
-
-## Deploy
-
-One service on **Railway** (app + Postgres, no CORS). See **[DEPLOY.md](DEPLOY.md)** — includes the
-CLI and GitHub paths, env-var table, and Stripe webhook setup. `Dockerfile`, `docker-compose.yml`,
-`fly.toml`, and `render.yaml` are included for other hosts.
-
-## Repo layout
-
-```
-app/           full-stack application (server/, public/, migrations, tests)
-docs/          business plan, MVP scope, validation plan
-mvp/           original single-file prototype
-.github/       CI workflow
-DEPLOY.md      deployment guide
-```
-
-## Status & disclaimers
-
-Working MVP — **not production-hardened**. See the go-live checklist in [app/README.md](app/README.md)
-(HIPAA-grade hosting, security review, real Stripe keys, legal counsel). Overturn is a self-help
-document-preparation tool, not a law firm or medical provider, and does not provide legal or medical
-advice. Outcomes are not guaranteed.
-
-## License
-
-Proprietary — all rights reserved. See [LICENSE](LICENSE).
+Working MVP, not production hardened. Overturn is a self help document preparation tool, not a law firm or medical provider, and does not provide legal or medical advice. Outcomes are not guaranteed.
