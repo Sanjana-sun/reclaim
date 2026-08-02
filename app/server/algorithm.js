@@ -3,6 +3,7 @@ const { callClaude, callVision, available } = require('./llm');
 const prompts = require('./prompts');
 const verticals = require('./verticals');
 const legal = require('./legal');
+const agent = require('./agent');
 
 const PROMPT_VERSION = 'v1';
 
@@ -41,13 +42,36 @@ async function classify(intake) {
 async function draftAppeal(intake, cls) {
   const ctx = legal.retrieve({ reason: cls.reason, planType: cls.planType, state: cls.state, denialCode: cls.denialCode, service: intake.service, notes: intake.notes });
   let letter = null;
-  if (available()) {
+  let citations = [];
+  let agentTrace = null;
+
+  // Preferred path: RAG + tool-use agent (plans, retrieves, then grounds the letter).
+  // Off with DRAFT_AGENT=false; any failure falls through to the single-shot / template paths.
+  if (available() && process.env.DRAFT_AGENT !== 'false') {
+    try {
+      const out = await agent.draftWithRag(intake, cls);
+      if (out && out.letter) { letter = out.letter; citations = out.citations || []; agentTrace = out.trace || []; }
+    } catch (e) { letter = null; }
+  }
+
+  // Fallback: single-shot draft with the applicable rights injected into the prompt.
+  if (!letter && available()) {
     const user = prompts.draftUser(intake, cls) + rightsPromptBlock(ctx);
     letter = await callClaude({ system: prompts.DRAFT_SYSTEM, user, maxTokens: 1500 });
   }
+  // Free, no-key path: deterministic RAG drafter — retrieval + tools, grounded and cited,
+  // no API call. This is what runs when there is no ANTHROPIC_API_KEY at all.
+  if (!letter) {
+    try {
+      const g = agent.draftGrounded(intake, cls);
+      if (g && g.letter) { letter = g.letter; citations = g.citations || []; agentTrace = g.trace || []; }
+    } catch (e) { letter = null; }
+  }
+  // Last resort: the original bare template.
   if (!letter) letter = templateLetter(intake, cls, ctx);
+
   const linted = lint(letter, cls);
-  return { ...linted, rights: ctx.rights, evidence: ctx.evidence, codeGuidance: ctx.codeGuidance };
+  return { ...linted, rights: ctx.rights, evidence: ctx.evidence, codeGuidance: ctx.codeGuidance, citations, agentTrace };
 }
 
 function rightsPromptBlock(ctx) {

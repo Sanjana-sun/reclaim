@@ -34,6 +34,17 @@ Sign up as a patient with no code, or use org codes `PROVIDER` / `PHARMA` / `EMP
   attribution + recovery + ACV; employer PMPM + aggregate outcomes.
 - **Algorithm** (`server/algorithm.js`): classifier, drafter (Claude + template fallback),
   safety linter, bill detector, and the de-identified win-rate flywheel.
+- **RAG + tool-use agent** (`server/rag.js`, `server/agent.js`): retrieval-grounded drafting.
+  A BM25 retriever indexes 32 legal passages (federal rights, per-state rules, CARC codes) from
+  a curated corpus (`server/legal/corpus.js`) — this runs with **no API key**. Two drafting
+  backends sit on top of it:
+  - **Free (no key, default)**: a deterministic planner runs the same tools
+    (`get_federal_rights`, `get_state_rules`, `lookup_denial_code`, `search_legal_kb`,
+    `check_bill_benchmark`) and assembles a grounded, cited appeal — fully offline, always works.
+  - **Claude agent (if `ANTHROPIC_API_KEY` is set)**: a tool-use agent plans, calls those same
+    tools, and writes the appeal citing only what it retrieved.
+  Order: Claude agent (if key) → free RAG drafter → bare template. Both grounded paths return the
+  citations and the tool-call trace behind the letter.
 - **Auth**: JWT + bcrypt, role-based access, five role-scoped portals.
 - **Admin**: revenue-by-engine + win-rate moat.
 
@@ -80,6 +91,11 @@ medical-necessity reasons, no banned/guarantee language, disclaimer present, cor
 reason-specific framing) and the bill detector. Runs in template mode without a key, and
 validates real Claude output the same way when `ANTHROPIC_API_KEY` is set. Exit code 1 on any
 failure — wire it into CI.
+
+`node eval/agent-demo.js` — shows the RAG retriever ranking passages for sample denials,
+smoke-tests each tool, and drafts a full appeal end-to-end, printing the plan → tool-call →
+citation trace. Runs entirely offline with the free drafter; uses the Claude agent instead when
+`ANTHROPIC_API_KEY` is set.
 
 ## Deployment
 
