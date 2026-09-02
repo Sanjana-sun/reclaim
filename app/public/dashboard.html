@@ -67,10 +67,10 @@ function renderAppeal(a,sponsored){
   const box=document.getElementById('appealResult'); box.classList.remove('hide');
   box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">Your appeal draft</h2><span class="badge">AI-drafted</span></div>
     <div class="flag"><b>Deadline:</b> ${OT.esc(a.deadline_text)} (by ${new Date(a.deadline).toLocaleDateString()})</div>
-    ${a.needs_medical_necessity?'<div class="flag warn"><b>Attach your doctor\\'s letter.</b> This appeal relies on your treating physician\\'s statement of medical necessity — Overturn organizes it but does not make the medical judgment.</div>':''}
+    ${a.needs_medical_necessity?'<div class="flag warn"><b>Attach your doctor\'s letter.</b> This appeal relies on your treating physician\'s statement of medical necessity — Overturn organizes it but does not make the medical judgment.</div>':''}
     ${a.review_status==='pending'?'<div class="flag">In our clinical-review queue for a quality check on the medical-necessity framing.</div>':''}
     ${a.review_status==='approved'?'<div class="flag"><b>Clinician-reviewed.</b> A licensed reviewer confirmed the medical-necessity framing'+(a.reviewer_note?': '+OT.esc(a.reviewer_note):'.')+'</div>':''}
-    ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\\'s free to you.</div>':''}
+    ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\'s free to you.</div>':''}
     ${(a.rights&&a.rights.length)?`<div style="margin:14px 0;"><b>Rights cited in your appeal</b><ul style="margin:8px 0 0;padding-left:18px;">${a.rights.map(r=>`<li style="margin:4px 0;"><b>${OT.esc(r.title)}</b> <span class="muted">— ${OT.esc(r.citation)}</span></li>`).join('')}</ul></div>`:''}
     ${(a.evidence&&a.evidence.length)?`<div class="flag"><b>Evidence to gather &amp; attach:</b><ul style="margin:8px 0 0;padding-left:18px;">${a.evidence.map(e=>`<li style="margin:3px 0;">${OT.esc(e)}</li>`).join('')}</ul></div>`:''}
     ${a.code_guidance?`<div class="flag warn"><b>Denial code:</b> ${OT.esc(a.code_guidance.note)}</div>`:''}
@@ -115,7 +115,7 @@ async function stripePay(clientSecret){
     };
   });
 }
-async function submitAppeal(id){ await OT.api('/appeals/'+id+'/submit',{method:'POST'}); document.getElementById('afterSubmit_'+id).innerHTML='<div class="flag">Submitted. When you hear back, record the outcome below so we learn.</div><div style="display:flex;gap:8px;"><button class="small" onclick="outcome('+id+',\\'won\\')">It was overturned 🎉</button><button class="small ghost" onclick="outcome('+id+',\\'lost\\')">Denied again</button></div>'; loadAppeals(); }
+async function submitAppeal(id){ await OT.api('/appeals/'+id+'/submit',{method:'POST'}); document.getElementById('afterSubmit_'+id).innerHTML='<div class="flag">Submitted. When you hear back, record the outcome below so we learn.</div><div style="display:flex;gap:8px;"><button class="small" onclick="outcome('+id+',\'won\')">It was overturned 🎉</button><button class="small ghost" onclick="outcome('+id+',\'lost\')">Denied again</button></div>'; loadAppeals(); }
 async function outcome(id,o){ let amt=0; if(o==='won'){ amt=prompt('Roughly how much was covered/recovered? ($)','0'); } await OT.api('/appeals/'+id+'/outcome',{method:'POST',body:{outcome:o,amountRecovered:Number(amt)||0}}); loadAppeals(); }
 async function parseDenial(){
   const f=document.getElementById('denialFile').files[0]; const msg=document.getElementById('parseMsg');
@@ -130,6 +130,7 @@ async function parseDenial(){
     msg.textContent='Filled from your letter — please review and adjust before generating.';
   }catch(e){ msg.textContent=e.message; }
 }
+async function viewAppeal(id){ const {appeal}=await OT.api('/appeals/'+id); renderAppeal(appeal,false); }
 async function shareAppeal(id){ const {url}=await OT.api('/appeals/'+id+'/share',{method:'POST',body:{origin:location.origin}}); try{await navigator.clipboard.writeText(url);}catch(e){} OT.toast('Share link copied'); }
 async function requestExternal(id){ await OT.api('/appeals/'+id+'/external-review',{method:'POST'}); OT.toast('External-review letter ready'); loadAppeals(); }
 async function loadAppeals(){ const {appeals}=await OT.api('/appeals'); const el=document.getElementById('appealList');
@@ -139,6 +140,7 @@ async function loadAppeals(){ const {appeals}=await OT.api('/appeals'); const el
     if(a.status==='won') act=`<button class="small" onclick="shareAppeal(${a.id})">Share win</button>`;
     else if(a.status==='lost') act=`<button class="small ghost" onclick="requestExternal(${a.id})">External review</button>`;
     else if(a.status==='external_review') act=`<span class="badge">external review</span>`;
+    else act=`<button class="small ghost" onclick="viewAppeal(${a.id})">View</button>`;
     return `<tr><td>${OT.esc(a.service||'—')}</td><td>${OT.esc(a.insurer||'—')}</td><td><span class="badge ${a.status==='won'?'ok':a.status==='lost'?'gray':'warn'}">${OT.esc(a.status)}</span></td><td>${new Date(a.deadline).toLocaleDateString()}</td><td>${a.amount_recovered?OT.money(a.amount_recovered):'—'}</td><td>${act}</td></tr>`;
   }).join('')+'</table>';
 }

@@ -38,8 +38,12 @@ async function classify(intake) {
 
 // ---------------------------------------------------------------------------
 // 2. Drafter — Claude if available, else template. Always run through linter.
+// Pass { deterministic: true } to skip the model tiers entirely and draft from retrieval
+// alone: same citations, byte-identical output, no network. Used for seeded example appeals
+// and for deployments that cannot send patient facts to a model vendor.
 // ---------------------------------------------------------------------------
-async function draftAppeal(intake, cls) {
+async function draftAppeal(intake, cls, opts = {}) {
+  const deterministic = opts.deterministic === true;
   const ctx = legal.retrieve({ reason: cls.reason, planType: cls.planType, state: cls.state, denialCode: cls.denialCode, service: intake.service, notes: intake.notes });
   let letter = null;
   let citations = [];
@@ -47,7 +51,7 @@ async function draftAppeal(intake, cls) {
 
   // Preferred path: RAG + tool-use agent (plans, retrieves, then grounds the letter).
   // Off with DRAFT_AGENT=false; any failure falls through to the single-shot / template paths.
-  if (available() && process.env.DRAFT_AGENT !== 'false') {
+  if (!deterministic && available() && process.env.DRAFT_AGENT !== 'false') {
     try {
       const out = await agent.draftWithRag(intake, cls);
       if (out && out.letter) { letter = out.letter; citations = out.citations || []; agentTrace = out.trace || []; }
@@ -55,7 +59,7 @@ async function draftAppeal(intake, cls) {
   }
 
   // Fallback: single-shot draft with the applicable rights injected into the prompt.
-  if (!letter && available()) {
+  if (!letter && !deterministic && available()) {
     const user = prompts.draftUser(intake, cls) + rightsPromptBlock(ctx);
     letter = await callClaude({ system: prompts.DRAFT_SYSTEM, user, maxTokens: 1500 });
   }

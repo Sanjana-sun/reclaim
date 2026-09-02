@@ -97,11 +97,79 @@ async function seed() {
   await insert('users', { email: 'provider@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'provider', org_id: provider.id, name: 'Clinic Admin' });
   await insert('users', { email: 'employer@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'employer', org_id: employer.id, name: 'HR Benefits' });
   await insert('users', { email: 'clinician@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'clinician', org_id: clinicOrg.id, name: 'Dr. Lee, RN' });
-  await insert('users', { email: 'patient@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'consumer', org_id: null, name: 'Sam Rivera' });
+  const patient = await insert('users', { email: 'patient@overturn.dev', password_hash: bcrypt.hashSync('demo1234', 8), role: 'consumer', org_id: null, name: 'Sam Rivera' });
+  await seedExampleAppeal(patient);
   const insurers = ['UnitedHealthcare', 'Aetna', 'Cigna', 'Anthem BCBS'];
   const reasons = ['medical_necessity', 'prior_auth', 'step_therapy', 'experimental'];
   for (let i = 0; i < 60; i++) {
     await insert('winrate', { insurer: insurers[i % insurers.length], plan_type: ['commercial', 'aca', 'ma'][i % 3], reason: reasons[i % reasons.length], outcome: Math.random() < 0.55 ? 'won' : 'lost' });
+  }
+}
+
+// One worked example appeal so a fresh install isn't an empty dashboard, and so the
+// clinician review queue has something in it. Drafted by the real pipeline
+// (classify -> retrieve -> draft -> lint) with the deterministic flag set, so the seeded
+// letter is genuine product output: the same citations, the same evidence checklist, and
+// the same safety linter as a live appeal, with no API key and no network call.
+async function seedExampleAppeal(patient) {
+  const intake = {
+    insurer: 'Aetna',
+    plan: 'commercial',
+    reason: 'medical_necessity',
+    service: 'MRI lumbar spine with contrast',
+    drug: null,
+    state: 'MA',
+    denialCode: 'CO-50',
+    notes: 'I have had lower back pain and left leg numbness for about five months. Physical '
+      + 'therapy for eight weeks and two rounds of steroids did not help. My orthopedic surgeon '
+      + 'ordered the MRI to check for a herniated disc before deciding on surgery. Aetna denied '
+      + 'it as not medically necessary without anyone speaking to my surgeon.',
+  };
+
+  try {
+    // Lazy require: algorithm.js depends on this module, so requiring it at the top would
+    // be circular. Same pattern as server/agent.js.
+    const { classify, draftAppeal } = require('./algorithm');
+    const cls = await classify(intake);
+    const drafted = await draftAppeal(intake, cls, { deterministic: true });
+
+    // Backdate the denial three weeks so the deadline countdown looks like a real case.
+    const deniedAt = new Date(Date.now() - 21 * 86400000);
+    const deadline = new Date(deniedAt.getTime() + cls.deadlineDays * 86400000);
+
+    await insert('appeals', {
+      user_id: patient.id,
+      vertical: cls.vertical,
+      insurer: intake.insurer,
+      plan_type: cls.planType,
+      reason: cls.reason,
+      service: intake.service,
+      drug: null,
+      state: cls.state,
+      denial_code: intake.denialCode,
+      notes: intake.notes,
+      letter: drafted.letter,
+      status: 'draft',
+      deadline: deadline.toISOString(),
+      deadline_text: cls.deadlineText,
+      rights: drafted.rights || [],
+      evidence: drafted.evidence || [],
+      code_guidance: drafted.codeGuidance || null,
+      needs_medical_necessity: drafted.needsMedicalNecessity,
+      sponsor_org_id: null,
+      sponsor_rate: null,
+      provider_org_id: null,
+      amount_recovered: 0,
+      paid: false,
+      // Medical-necessity appeals queue for a licensed reviewer, so this also populates
+      // the clinician portal.
+      review_status: drafted.needsMedicalNecessity ? 'pending' : 'not_required',
+      reviewer_note: null,
+      created_at: deniedAt.toISOString(),
+    });
+  } catch (e) {
+    // A demo fixture is never worth failing startup over.
+    console.warn('Skipped example appeal seed:', e.message);
   }
 }
 

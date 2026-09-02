@@ -12,6 +12,9 @@ const COMMON = {
     title: 'State external review through the Department of Insurance',
     summary: 'For a fully-insured plan, if your internal appeal is denied you can request an independent external review through your state DOI; the reviewer\'s decision binds the insurer.',
     citation: 'ACA-mandated external review; state DOI program (verify specifics)',
+    // Stage-scoped: cite this right in the internal appeal, but don't tell the patient to
+    // attach external-review paperwork to it. That comes later, if the internal appeal fails.
+    stage: 'external',
     evidence: ['Final internal denial letter', 'External review request form (from the state DOI)'],
   },
   stepTherapy: {
@@ -20,12 +23,16 @@ const COMMON = {
     summary: 'Most states require insurers to grant a step-therapy exception when the required drug was tried and failed, is contraindicated, or is medically inappropriate. Confirm your state\'s specific law and timelines.',
     citation: 'State step-therapy override law (verify specifics with your state DOI)',
     evidence: ['Physician attestation of prior failure/intolerance/contraindication'],
+    // Only cite this where the denial is actually about fail-first. Citing a drug-tiering
+    // statute in, say, an imaging appeal is noise at best and a credibility problem at worst.
+    applies: ({ reason, notes }) => reason === 'step_therapy'
+      || /step[- ]therapy|fail[- ]first|tried and failed|preferred (drug|agent|medication)|formulary tier/i.test(notes || ''),
   },
 };
 
 const SPECIFICS = {
   CA: [{ id: 'ca_sb1120', title: 'Physician review of AI denials (CA SB 1120)', summary: 'A medical-necessity denial cannot be made solely by an algorithm; a licensed physician must review it. Strict UM timelines apply (5 business days standard / 72 hours urgent).', citation: 'California SB 1120 (2024, eff. 2025)', evidence: ['Ask whether an algorithm made the decision and demand physician review'] }],
-  NY: [{ id: 'ny_dfs_external', title: 'New York external appeal (DFS)', summary: 'New York runs a robust external appeal program through the Department of Financial Services for medical-necessity and experimental/investigational denials.', citation: 'NY Ins. Law Art. 49; NY DFS', evidence: ['NY external appeal application'] }],
+  NY: [{ id: 'ny_dfs_external', title: 'New York external appeal (DFS)', summary: 'New York runs a robust external appeal program through the Department of Financial Services for medical-necessity and experimental/investigational denials.', citation: 'NY Ins. Law Art. 49; NY DFS', stage: 'external', evidence: ['NY external appeal application'] }],
   TX: [{ id: 'tx_hb3459', title: 'Prior-authorization "gold card" (TX HB 3459)', summary: 'Physicians with a strong approval history are exempt from prior authorization for certain services; onerous prior-auth denials can be challenged on this basis.', citation: 'Texas HB 3459 (2021)', evidence: ['Evidence the service should be exempt or was improperly required'] }],
   IL: [{ id: 'il_clinical_peer', title: 'Clinical-peer review of medical-necessity denials', summary: 'Illinois requires a clinical peer to make adverse medical-necessity determinations; algorithms may not be the sole decision-maker.', citation: 'Illinois insurance regulations', evidence: ['Demand clinical-peer review'] }],
   WA: [{ id: 'wa_mhmda', title: 'My Health My Data (privacy)', summary: 'Washington provides strong consumer health-data privacy protections.', citation: 'WA My Health My Data Act (2023)', evidence: [] }],

@@ -40,7 +40,9 @@ module.exports = [
     summary: 'Plans cannot apply more restrictive limits, medical-necessity criteria, or prior-auth to mental-health/substance-use benefits than to comparable medical/surgical benefits. Ask for the plan\'s parity comparative analysis.',
     citation: 'Mental Health Parity and Addiction Equity Act, 29 U.S.C. §1185a',
     evidence: ['A request for the plan\'s NQTL comparative analysis', 'Notes showing the treatment is behavioral-health related'],
-    applies: ({ service, notes }) => /mental|behavioral|therapy|psych|substance|addiction|SUD|autism|ABA/i.test(`${service || ''} ${notes || ''}`),
+    // Deliberately narrow: a bare "therapy" match pulled parity law into physical-therapy and
+    // occupational-therapy cases, and unanchored SUD/ABA matched inside "sudden"/"database".
+    applies: ({ service, notes }) => /mental health|behavioral health|behavioral|psych|substance (use|abuse)|addiction|\bSUD\b|autism|\bABA\b|depression|anxiety|eating disorder|inpatient rehab/i.test(`${service || ''} ${notes || ''}`),
   },
   {
     id: 'medical_necessity_standard',
