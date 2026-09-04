@@ -49,8 +49,8 @@ button:disabled{opacity:.5;cursor:default;transform:none;}
 
 /* nav */
 .nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);}
-.nav-inner{display:flex;align-items:center;justify-content:space-between;height:66px;}
-.brand{display:flex;align-items:center;gap:0;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em;}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;height:66px;}
+.brand{display:flex;align-items:center;gap:0;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.02em;flex-shrink:0;}
 .brand:hover{color:var(--ink);}
 .brand .logo{width:30px;height:30px;border-radius:8px;background:var(--brand);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:var(--shadow-sm);margin-right:9px;}
 .brand b{color:var(--brand);}

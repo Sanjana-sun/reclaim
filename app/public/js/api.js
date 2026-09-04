@@ -50,8 +50,8 @@ function navBar(u) {
   return `<header class="nav"><div class="container nav-inner">
     <a class="brand" href="/">${LOGO}Re<b>claim</b></a>
     <nav class="nav-links">
-      ${links.map((l) => `<a href="${l[0]}">${l[1]}</a>`).join('')}
-      <span class="nav-user"><span class="avatar" style="width:28px;height:28px;font-size:12px;">${OT.esc((u.name || u.email)[0].toUpperCase())}</span><span class="hide-sm">${OT.esc(u.name || u.email)}</span></span>
+      ${links.map((l) => `<a href="${l[0]}" class="hide-sm">${l[1]}</a>`).join('')}
+      <a href="${links.length ? links[links.length - 1][0] : '/'}" class="nav-user" style="text-decoration:none;color:inherit;"><span class="avatar" style="width:28px;height:28px;font-size:12px;">${OT.esc((u.name || u.email)[0].toUpperCase())}</span><span class="hide-sm">${OT.esc(u.name || u.email)}</span></a>
       <a href="#" class="link" onclick="OT.logout();return false;">Log out</a>
     </nav></div></header>`;
 }
