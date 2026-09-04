@@ -30,7 +30,7 @@ router.get('/:id/download', requireAuth(['consumer']), async (req, res, next) =>
     if (!b) return res.status(404).json({ error: 'Not found' });
     const pdf = await buildPDF(b.dispute_letter || '');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Overturn-bill-dispute-${b.id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Reclaim-bill-dispute-${b.id}.pdf"`);
     res.send(pdf);
   } catch (e) { next(e); }
 });

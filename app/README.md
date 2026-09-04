@@ -1,4 +1,4 @@
-# Overturn — full-stack app
+# Reclaim — full-stack app
 
 AI patient advocate with all three revenue engines, auth, and five portals. Runs locally
 with no external database and no API key (LLM drafting falls back to templates).

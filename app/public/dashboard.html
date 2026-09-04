@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Overturn — my dashboard</title><link rel="stylesheet" href="css/app.css">
+<title>Reclaim — my dashboard</title><link rel="stylesheet" href="css/app.css">
 <style>
 .wiz-steps{display:flex;gap:8px;margin:6px 0 22px;flex-wrap:wrap;}
 .wiz-chip{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:500;color:var(--mut);padding:8px 15px;border:1px solid var(--line);border-radius:100px;background:var(--surface);}
@@ -153,7 +153,7 @@ async function downloadBill(id){
     const r=await fetch('/api/bills/'+id+'/download',{headers:{authorization:'Bearer '+OT.token()}});
     if(!r.ok){ OT.toast('Could not download — please try again'); return; }
     const blob=await r.blob(); const url=URL.createObjectURL(blob);
-    const el=document.createElement('a'); el.href=url; el.download='Overturn-bill-dispute-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    const el=document.createElement('a'); el.href=url; el.download='Reclaim-bill-dispute-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
     OT.toast('Downloaded');
   }catch(e){ OT.toast(e.message); }
 }
@@ -205,7 +205,7 @@ async function downloadAppeal(id){
     if(r.status===402){ return payThenDownload(id); }
     if(!r.ok){ OT.toast('Could not download — please try again'); return; }
     const blob=await r.blob(); const url=URL.createObjectURL(blob);
-    const el=document.createElement('a'); el.href=url; el.download='Overturn-appeal-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    const el=document.createElement('a'); el.href=url; el.download='Reclaim-appeal-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
     OT.toast('Downloaded');
   }catch(e){ OT.toast(e.message); }
 }

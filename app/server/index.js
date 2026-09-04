@@ -40,7 +40,7 @@ app.use((err, req, res, next) => { console.error(err); res.status(500).json({ er
 const PORT = process.env.PORT || 3000;
 init().then((be) => {
   app.listen(PORT, () => {
-    console.log(`Overturn running on http://localhost:${PORT}`);
+    console.log(`Reclaim running on http://localhost:${PORT}`);
     console.log(`Data backend: ${be.toUpperCase()}${be === 'json' ? ' (set DATABASE_URL for Postgres)' : ''}`);
     console.log(`LLM drafting: ${process.env.ANTHROPIC_API_KEY ? 'Claude (ENABLED)' : 'template fallback (set ANTHROPIC_API_KEY)'}`);
     console.log(`Payments: ${payments.enabled() ? 'Stripe (ENABLED)' : 'stub (set STRIPE_SECRET_KEY)'}`);

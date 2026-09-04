@@ -121,7 +121,7 @@ function lint(text, cls) {
   let t = text;
   const banned = [/\bwe guarantee\b/gi, /\bguaranteed\b/gi, /\bwill definitely win\b/gi, /\bas your (lawyer|attorney)\b/gi, /\brobot lawyer\b/gi];
   banned.forEach((re) => { t = t.replace(re, ''); });
-  const disclaimer = '\n\n---\nPrepared with Overturn, a self-help document tool (not a law firm or medical provider; not legal or medical advice). You review, sign, and submit this appeal yourself.';
+  const disclaimer = '\n\n---\nPrepared with Reclaim, a self-help document tool (not a law firm or medical provider; not legal or medical advice). You review, sign, and submit this appeal yourself.';
   if (!t.includes('self-help document tool')) t += disclaimer;
   return { letter: t.trim(), needsMedicalNecessity: cls.needsMedicalNecessity };
 }
@@ -180,7 +180,7 @@ Sincerely,
 [Phone] · [Email]
 
 ---
-Prepared with Overturn, a self-help document tool. Not legal advice. You review, sign, and submit this dispute yourself.`;
+Prepared with Reclaim, a self-help document tool. Not legal advice. You review, sign, and submit this dispute yourself.`;
   return letter;
 }
 
@@ -248,7 +248,7 @@ Sincerely,
 [Your name]
 
 ---
-Prepared with Overturn, a self-help document tool. Not legal or medical advice. You review, sign, and submit this request yourself.`;
+Prepared with Reclaim, a self-help document tool. Not legal or medical advice. You review, sign, and submit this request yourself.`;
 }
 
 async function winStats() {

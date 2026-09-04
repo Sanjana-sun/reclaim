@@ -48,7 +48,7 @@ const LOGO = '<span class="logo"><svg width="17" height="17" viewBox="0 0 24 24"
 function navBar(u) {
   const links = { consumer: [['/dashboard.html', 'Dashboard'], ['/account.html', 'Account']], provider: [['/provider.html', 'Portal']], pharma: [['/pharma.html', 'Programs']], employer: [['/employer.html', 'Benefits']], clinician: [['/clinician.html', 'Review queue']], admin: [['/admin.html', 'Metrics']] }[u.role] || [];
   return `<header class="nav"><div class="container nav-inner">
-    <a class="brand" href="/">${LOGO}Over<b>turn</b></a>
+    <a class="brand" href="/">${LOGO}Re<b>claim</b></a>
     <nav class="nav-links">
       ${links.map((l) => `<a href="${l[0]}">${l[1]}</a>`).join('')}
       <span class="nav-user"><span class="avatar" style="width:28px;height:28px;font-size:12px;">${OT.esc((u.name || u.email)[0].toUpperCase())}</span><span class="hide-sm">${OT.esc(u.name || u.email)}</span></span>

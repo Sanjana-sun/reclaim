@@ -43,7 +43,7 @@ router.post('/forgot-password', async (req, res, next) => {
       const token = crypto.randomBytes(24).toString('hex');
       await update('users', user.id, { reset_token: token, reset_expires: Date.now() + 3600000 });
       const link = `${process.env.APP_URL || ''}/reset.html?token=${token}`;
-      await sendEmail({ to: user.email, subject: 'Reset your Overturn password', text: `Reset your password (link valid 1 hour):\n${link}\n\nIf you didn't request this, ignore this email.` });
+      await sendEmail({ to: user.email, subject: 'Reset your Reclaim password', text: `Reset your password (link valid 1 hour):\n${link}\n\nIf you didn't request this, ignore this email.` });
     }
     res.json({ ok: true });
   } catch (e) { next(e); }

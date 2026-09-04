@@ -13,7 +13,7 @@ function buildPDF(body, { footer } = {}) {
       doc.on('error', reject);
 
       const W = doc.page.width;
-      const foot = footer || 'Prepared with Overturn — a self-help document tool. Not a law firm or medical provider; not legal or medical advice.';
+      const foot = footer || 'Prepared with Reclaim — a self-help document tool. Not a law firm or medical provider; not legal or medical advice.';
 
       // Letterhead accent bar across the top.
       doc.rect(0, 0, W, 6).fill('#2563eb');

@@ -21,7 +21,7 @@ const CASES = [
 
 async function run() {
   let pass = 0, fail = 0;
-  console.log(`\nOverturn eval — prompt ${PROMPT_VERSION} — LLM ${process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'template mode'}\n`);
+  console.log(`\nReclaim eval — prompt ${PROMPT_VERSION} — LLM ${process.env.ANTHROPIC_API_KEY ? 'ENABLED' : 'template mode'}\n`);
   for (const c of CASES) {
     const cls = await classify(c.intake);
     const { letter, needsMedicalNecessity } = await draftAppeal(c.intake, cls);

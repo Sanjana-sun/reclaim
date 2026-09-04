@@ -1,4 +1,4 @@
-# Overturn — MVP scope & 90-day plan
+# Reclaim — MVP scope & 90-day plan
 
 ## MVP thesis
 Ship the smallest thing that (a) produces a genuinely good appeal a patient will sign and

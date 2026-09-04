@@ -1,7 +1,7 @@
 // Email sender. RESEND_API_KEY set -> real email via Resend; else logs to console (dev).
 async function sendEmail({ to, subject, text, html }) {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || 'Overturn <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || 'Reclaim <onboarding@resend.dev>';
   if (!key) {
     console.log(`[email:dev] to=${to} | ${subject}\n${text || ''}\n`);
     return { dev: true };

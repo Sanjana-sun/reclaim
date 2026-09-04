@@ -89,7 +89,7 @@ async function seed() {
   const pharma = await insert('orgs', { name: 'NovoMed Pharma', type: 'pharma', code: 'PHARMA', meta: { sponsored_programs: [{ drug: 'Ozempic', budget: 500000, spent: 0, rate: 75 }, { drug: 'Wegovy', budget: 300000, spent: 0, rate: 75 }] } });
   const provider = await insert('orgs', { name: 'Cascade Orthopedics', type: 'provider', code: 'PROVIDER', meta: { acv: 15000, specialty: 'orthopedics' } });
   const employer = await insert('orgs', { name: 'Acme Corp', type: 'employer', code: 'EMPLOYER', meta: { covered_lives: 4200, pmpm: 0.5 } });
-  const clinicOrg = await insert('orgs', { name: 'Overturn Clinical Review', type: 'clinician', code: 'CLINICIAN', meta: {} });
+  const clinicOrg = await insert('orgs', { name: 'Reclaim Clinical Review', type: 'clinician', code: 'CLINICIAN', meta: {} });
 
   // Demo staff/patient accounts and sample data only when SEED_DEMO is not 'false'.
   if (!demo) return;

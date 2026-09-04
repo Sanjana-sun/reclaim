@@ -1,4 +1,4 @@
-# Overturn — Business Plan
+# Reclaim — Business Plan
 
 Working name. AI patient advocate for insurance-denial appeals and medical-bill disputes.
 

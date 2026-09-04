@@ -1,4 +1,4 @@
-# Deploying Overturn
+# Deploying Reclaim
 
 The whole app (marketing site + all portals + API + Postgres) runs as **one service** on
 Railway. Frontend is served by the same Express server, so there's no split and no CORS.

@@ -81,7 +81,7 @@ router.get('/:id/download', requireAuth(['consumer']), async (req, res, next) =>
     if (!a.paid) return res.status(402).json({ error: 'Payment required to download your finished appeal' });
     const pdf = await buildPDF(a.letter);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Overturn-appeal-${a.id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Reclaim-appeal-${a.id}.pdf"`);
     res.send(pdf);
   } catch (e) { next(e); }
 });

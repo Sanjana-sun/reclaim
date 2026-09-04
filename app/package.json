@@ -1,5 +1,5 @@
 {
-  "name": "overturn",
+  "name": "reclaim",
   "version": "0.2.0",
   "description": "AI patient advocate — insurance appeals, medical-bill disputes, and B2B2C engines",
   "main": "server/index.js",

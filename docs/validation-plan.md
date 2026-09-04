@@ -1,4 +1,4 @@
-# Overturn — Demand validation plan (run BEFORE heavy build)
+# Reclaim — Demand validation plan (run BEFORE heavy build)
 
 Goal: cheaply prove that (1) people with denials want this, and (2) they'll pay — before
 sinking months into engineering. Budget: ~$0–500 and ~2 weeks.

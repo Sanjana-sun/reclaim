@@ -12,7 +12,7 @@ router.post('/pay-appeal/:id', requireAuth(['consumer']), async (req, res, next)
     if (!a) return res.status(404).json({ error: 'Not found' });
     if (a.paid) return res.json({ appeal: a, alreadyPaid: true });
     const price = Number(process.env.APPEAL_PRICE) || 10;
-    const charge = await payments.createCharge({ amountUsd: price, description: 'Overturn appeal ' + a.id, metadata: { appeal_id: a.id, user_id: req.user.id } });
+    const charge = await payments.createCharge({ amountUsd: price, description: 'Reclaim appeal ' + a.id, metadata: { appeal_id: a.id, user_id: req.user.id } });
     await insert('payments', { user_id: req.user.id, engine: 'consumer', amount: price, status: charge.status, provider: charge.provider, ref_type: 'appeal', ref_id: a.id, provider_ref: charge.id || null });
     // Stub (no Stripe key) succeeds immediately. With Stripe, the client confirms the
     // clientSecret and a webhook flips `paid` in production.

@@ -1,11 +1,11 @@
-# Overturn
+# Reclaim
 
 AI that helps patients fight denied insurance claims and dispute wrong medical bills: it drafts a plan specific, citation backed appeal, and you review, sign, and send.
 
 
 ## Why it exists
 
-Fewer than 1% of US insurance denials are ever appealed, yet a large share of appeals win and most denials trace back to paperwork errors, not real coverage disputes. Meanwhile billions in medical debt sit on top of duplicate and upcoded charges. Overturn turns a citation backed appeal into a five minute act and puts it in patients' hands as a self help tool: not a law firm, not medical advice, you stay in control of what gets sent.
+Fewer than 1% of US insurance denials are ever appealed, yet a large share of appeals win and most denials trace back to paperwork errors, not real coverage disputes. Meanwhile billions in medical debt sit on top of duplicate and upcoded charges. Reclaim turns a citation backed appeal into a five minute act and puts it in patients' hands as a self help tool: not a law firm, not medical advice, you stay in control of what gets sent.
 
 ## Tech stack
 
@@ -55,4 +55,4 @@ Seeded demo accounts (patient, provider, pharma, employer, clinician, admin) are
 
 ## Status and disclaimers
 
-Working MVP, not production hardened. Overturn is a self help document preparation tool, not a law firm or medical provider, and does not provide legal or medical advice. Outcomes are not guaranteed.
+Working MVP, not production hardened. Reclaim is a self help document preparation tool, not a law firm or medical provider, and does not provide legal or medical advice. Outcomes are not guaranteed.
