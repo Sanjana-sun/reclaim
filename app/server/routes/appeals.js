@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const router = express.Router();
 const { insert, find, findOne, update } = require('../db');
 const { requireAuth } = require('../auth');
-const { classify, draftAppeal, recordOutcome, parseDenial, externalReviewLetter } = require('../algorithm');
+const { classify, draftAppeal, recordOutcome, parseDenial, externalReviewLetter, fillDetails } = require('../algorithm');
+const { buildPDF } = require('../pdfdoc');
 
 // Extract intake fields from an uploaded denial letter (image/PDF as a data URL).
 router.post('/parse', requireAuth(['consumer']), async (req, res, next) => {
@@ -15,10 +16,13 @@ router.post('/parse', requireAuth(['consumer']), async (req, res, next) => {
 
 router.post('/', requireAuth(['consumer']), async (req, res, next) => {
   try {
-    const { insurer, plan, reason, service, drug, notes, providerCode, state, denialCode } = req.body || {};
+    const { insurer, plan, reason, service, drug, notes, providerCode, state, denialCode, name, address, memberId, claimNumber, phone, email } = req.body || {};
     const intake = { insurer, plan, reason, service, drug, notes, state, denialCode };
     const cls = await classify(intake);
-    const { letter, needsMedicalNecessity, rights, evidence, codeGuidance } = await draftAppeal(intake, cls);
+    const drafted = await draftAppeal(intake, cls);
+    const { needsMedicalNecessity, rights, evidence, codeGuidance } = drafted;
+    const details = { name, address, memberId, claimNumber, phone, email };
+    const letter = fillDetails(drafted.letter, details);
 
     let sponsor = null;
     if (drug) {
@@ -37,7 +41,7 @@ router.post('/', requireAuth(['consumer']), async (req, res, next) => {
     const deadline = new Date(Date.now() + cls.deadlineDays * 86400000).toISOString();
     const appeal = await insert('appeals', {
       user_id: req.user.id, vertical: cls.vertical, insurer, plan_type: cls.planType, reason: cls.reason, service, drug: drug || null,
-      state: state || null, denial_code: denialCode || null, notes: notes || null, letter, status: 'draft',
+      state: state || null, denial_code: denialCode || null, notes: notes || null, letter, details, status: 'draft',
       deadline, deadline_text: cls.deadlineText, rights: rights || [], evidence: evidence || [], code_guidance: codeGuidance || null,
       needs_medical_necessity: needsMedicalNecessity, sponsor_org_id: sponsor ? sponsor.org_id : null,
       sponsor_rate: sponsor ? sponsor.rate : null, provider_org_id, amount_recovered: 0,
@@ -66,6 +70,19 @@ router.put('/:id', requireAuth(['consumer']), async (req, res, next) => {
     if (!a) return res.status(404).json({ error: 'Not found' });
     const updated = await update('appeals', a.id, { letter: req.body.letter != null ? req.body.letter : a.letter });
     res.json({ appeal: updated });
+  } catch (e) { next(e); }
+});
+
+// Download the finished, filled-in appeal as a PDF. Gated on payment (first appeal is free).
+router.get('/:id/download', requireAuth(['consumer']), async (req, res, next) => {
+  try {
+    const a = await findOne('appeals', (x) => x.id === +req.params.id && x.user_id === req.user.id);
+    if (!a) return res.status(404).json({ error: 'Not found' });
+    if (!a.paid) return res.status(402).json({ error: 'Payment required to download your finished appeal' });
+    const pdf = await buildPDF(a.letter);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Overturn-appeal-${a.id}.pdf"`);
+    res.send(pdf);
   } catch (e) { next(e); }
 });
 

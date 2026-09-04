@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { insert, find, findOne, update } = require('../db');
 const { requireAuth } = require('../auth');
-const { detectBillErrors, draftDisputeLetter } = require('../algorithm');
+const { detectBillErrors, draftDisputeLetter, fillDetails } = require('../algorithm');
+const { buildPDF } = require('../pdfdoc');
 
 router.post('/', requireAuth(['consumer']), async (req, res, next) => {
   try {
-    const { providerName, lineItems } = req.body || {};
+    const { providerName, lineItems, patientName, accountNumber } = req.body || {};
     const items = Array.isArray(lineItems) ? lineItems : [];
     const total = items.reduce((s, li) => s + (Number(li.amount) || 0), 0);
     const { findings, estimatedSavings } = detectBillErrors(items);
@@ -16,9 +17,21 @@ router.post('/', requireAuth(['consumer']), async (req, res, next) => {
       line_items: items, findings, estimated_savings: estimatedSavings,
       dispute_letter: null, status: 'reviewed', contingency_rate: rate, amount_saved: 0, fee_charged: 0,
     });
-    const letter = draftDisputeLetter(bill, findings);
+    const letter = fillDetails(draftDisputeLetter(bill, findings), { name: patientName, accountNumber, provider: providerName });
     const updated = await update('bills', bill.id, { dispute_letter: letter });
     res.json({ bill: updated });
+  } catch (e) { next(e); }
+});
+
+// Download the dispute letter as a PDF (free — bill disputes monetize on realized savings).
+router.get('/:id/download', requireAuth(['consumer']), async (req, res, next) => {
+  try {
+    const b = await findOne('bills', (x) => x.id === +req.params.id && x.user_id === req.user.id);
+    if (!b) return res.status(404).json({ error: 'Not found' });
+    const pdf = await buildPDF(b.dispute_letter || '');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Overturn-bill-dispute-${b.id}.pdf"`);
+    res.send(pdf);
   } catch (e) { next(e); }
 });
 

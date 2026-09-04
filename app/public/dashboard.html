@@ -34,12 +34,14 @@
       <div class="wiz-chip active" data-step="1"><span class="n">1</span><span class="lbl">Start</span></div>
       <div class="wiz-chip" data-step="2"><span class="n">2</span><span class="lbl">The denial</span></div>
       <div class="wiz-chip" data-step="3"><span class="n">3</span><span class="lbl">Your care</span></div>
-      <div class="wiz-chip" data-step="4"><span class="n">4</span><span class="lbl">Review &amp; send</span></div>
+      <div class="wiz-chip" data-step="4"><span class="n">4</span><span class="lbl">Your details</span></div>
+      <div class="wiz-chip" data-step="5"><span class="n">5</span><span class="lbl">Review</span></div>
     </div>
 
     <div class="card wiz-step" id="step1">
       <h2>Let's start your appeal</h2>
       <p class="muted-intro">Have your denial letter handy? Upload it and we'll read the details for you. No letter? Just skip ahead — we'll ask a few simple questions.</p>
+      <div class="flag"><b>What it costs:</b> your first appeal is <b>free</b>. After that, a finished, ready-to-mail PDF is <b>$10</b> (or unlimited with Plus at $12/mo). You'll see everything before you pay.</div>
       <label>Upload denial letter <span class="muted">(PDF or photo — optional)</span></label>
       <input type="file" id="denialFile" accept="image/*,application/pdf">
       <button class="small ghost" style="margin-top:10px;" onclick="parseDenial()">Read my letter</button>
@@ -74,11 +76,21 @@
       <textarea id="notes" placeholder="My doctor says I need this because…"></textarea>
       <label>Clinic code <span class="muted">(optional)</span></label><input id="providerCode" placeholder="e.g. PROVIDER">
       <div class="disc">Self-help tool — not a law firm or medical provider. You review, sign, and send it yourself. No outcome guarantee.</div>
-      <div id="genErr" class="err hide"></div>
-      <div class="wiz-nav"><button class="ghost" onclick="goStep(2)">← Back</button><button id="genBtn">Create my appeal →</button></div>
+      <div class="wiz-nav"><button class="ghost" onclick="goStep(2)">← Back</button><button onclick="goStep(4)">Continue →</button></div>
     </div>
 
-    <div class="wiz-step hide" id="step4"><div id="wizReview"></div></div>
+    <div class="card wiz-step hide" id="step4">
+      <h2>Your details</h2>
+      <p class="muted-intro">We put these straight into your letter so it's ready to sign and send — no blanks to fill in by hand.</p>
+      <div class="row"><div><label>Full name</label><input id="name" placeholder="Jane Doe"></div><div><label>Mailing address</label><input id="address" placeholder="12 Oak St, Denver, CO 80202"></div></div>
+      <div class="row"><div><label>Member ID <span class="muted">(on your insurance card)</span></label><input id="memberId" placeholder="XYZ123456789"></div><div><label>Claim number <span class="muted">(from the denial)</span></label><input id="claimNumber" placeholder="CLM-000123"></div></div>
+      <div class="row"><div><label>Phone</label><input id="phone" placeholder="(555) 123-4567"></div><div><label>Email</label><input id="email" placeholder="you@email.com"></div></div>
+      <div class="disc">Your details are used only to fill in your letter. We don't sell your data.</div>
+      <div id="genErr" class="err hide"></div>
+      <div class="wiz-nav"><button class="ghost" onclick="goStep(3)">← Back</button><button id="genBtn">Create my appeal →</button></div>
+    </div>
+
+    <div class="wiz-step hide" id="step5"><div id="wizReview"></div></div>
 
     <div style="margin-top:26px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <h2 style="margin:0;">My appeals</h2>
@@ -98,6 +110,7 @@
       <h2>Which bill are we fighting?</h2>
       <p class="muted-intro">Start with who sent it. Tip: if you only got a summary, ask the provider for an <b>itemized bill</b> — that's where the errors hide.</p>
       <label>Provider or hospital</label><input id="billProvider" placeholder="City General Hospital">
+      <div class="row"><div><label>Your full name</label><input id="patientName" placeholder="Jane Doe"></div><div><label>Account number <span class="muted">(on the bill)</span></label><input id="accountNumber" placeholder="ACCT-000123"></div></div>
       <div class="wiz-nav"><span></span><button onclick="goBStep(2)">Continue →</button></div>
     </div>
 
@@ -127,17 +140,28 @@
 <script>
 const u = OT.guard(['consumer']); if(u) document.getElementById('nav').innerHTML = navBar(u);
 function tab(t){ ['appeals','bills'].forEach(x=>{ document.getElementById('sec_'+x).classList.toggle('hide',x!==t); document.getElementById('t_'+x).classList.toggle('active',x===t); }); }
-function goStep(n){ [1,2,3,4].forEach(s=>document.getElementById('step'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#wizSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.step; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
-function resetWizard(){ ['insurer','service','drug','notes','denialCode','providerCode'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';}); const f=document.getElementById('denialFile'); if(f) f.value=''; document.getElementById('parseMsg').textContent=''; document.getElementById('wizReview').innerHTML=''; goStep(1); }
+function goStep(n){ [1,2,3,4,5].forEach(s=>document.getElementById('step'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#wizSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.step; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
+function resetWizard(){ ['insurer','service','drug','notes','denialCode','providerCode','name','address','memberId','claimNumber','phone','email'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';}); const f=document.getElementById('denialFile'); if(f) f.value=''; document.getElementById('parseMsg').textContent=''; document.getElementById('wizReview').innerHTML=''; goStep(1); }
 function copyLetter(){ const t=document.getElementById('letterBox'); if(t){ navigator.clipboard.writeText(t.innerText).then(()=>OT.toast('Letter copied')); } }
 function goBStep(n){ [1,2,3].forEach(s=>document.getElementById('bstep'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#billSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.bstep; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
 function resetBillWizard(){ const p=document.getElementById('billProvider'); if(p)p.value=''; const l=document.getElementById('lineItems'); if(l)l.value=''; document.getElementById('billErr').classList.add('hide'); document.getElementById('billReview').innerHTML=''; goBStep(1); }
 function copyDispute(){ const t=document.getElementById('disputeBox'); if(t){ navigator.clipboard.writeText(t.innerText).then(()=>OT.toast('Dispute letter copied')); } }
+async function downloadBill(id){
+  const box=document.getElementById('disputeBox');
+  try{ if(box){ /* dispute letter is not separately editable-saved; download uses stored letter */ } }catch(e){}
+  try{
+    const r=await fetch('/api/bills/'+id+'/download',{headers:{authorization:'Bearer '+OT.token()}});
+    if(!r.ok){ OT.toast('Could not download — please try again'); return; }
+    const blob=await r.blob(); const url=URL.createObjectURL(blob);
+    const el=document.createElement('a'); el.href=url; el.download='Overturn-bill-dispute-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    OT.toast('Downloaded');
+  }catch(e){ OT.toast(e.message); }
+}
 const err=(id,e)=>{const el=document.getElementById(id);el.textContent=e;el.classList.remove('hide');};
 
 document.getElementById('genBtn').addEventListener('click', async ()=>{
   document.getElementById('genErr').classList.add('hide');
-  const body={insurer:v('insurer'),plan:v('plan'),reason:v('reason'),service:v('service'),drug:v('drug'),notes:v('notes'),providerCode:v('providerCode'),state:v('state'),denialCode:v('denialCode')};
+  const body={insurer:v('insurer'),plan:v('plan'),reason:v('reason'),service:v('service'),drug:v('drug'),notes:v('notes'),providerCode:v('providerCode'),state:v('state'),denialCode:v('denialCode'),name:v('name'),address:v('address'),memberId:v('memberId'),claimNumber:v('claimNumber'),phone:v('phone'),email:v('email')};
   try{ const {appeal,sponsored}=await OT.api('/appeals',{method:'POST',body}); renderAppeal(appeal,sponsored); loadAppeals(); }
   catch(e){ err('genErr',e.message); }
 });
@@ -146,9 +170,9 @@ function renderAppeal(a,sponsored){
   const rights=(a.rights&&a.rights.length)?`<h3 style="margin:22px 0 4px;">Your rights, in plain English</h3><p class="muted" style="margin:0 0 8px;">These are the protections your letter leans on.</p>${a.rights.map(r=>`<div class="law-card"><h4>${OT.esc(r.title)}</h4><p>${OT.esc(r.summary||'')}</p><div class="src">Source: ${OT.esc(r.citation)}</div></div>`).join('')}<div class="disc" style="margin-top:12px;">General information, not legal advice — rights vary by plan and state. Verify before relying on them.</div>`:'';
   const evid=(a.evidence&&a.evidence.length)?`<h3 style="margin:22px 0 4px;">What to gather &amp; attach</h3><ul class="check">${a.evidence.map(e=>`<li>${OT.esc(e)}</li>`).join('')}</ul>`:'';
   const code=a.code_guidance?`<div class="flag warn" style="margin-top:14px;"><b>Your denial code:</b> ${OT.esc(a.code_guidance.note)}</div>`:'';
-  const payRow=a.paid
-    ? `${a.free_first?'<div class="flag" style="margin-bottom:12px;"><b>Your first appeal is on us.</b> No payment needed — send it, then mark it submitted below.</div>':''}<button onclick="submitAppeal(${a.id})">I\'ve sent it — mark as submitted</button>`
-    : `<button onclick="payAppeal(${a.id})">Finalize &amp; track for $10</button> <span class="muted" style="font-size:13px;margin-left:6px;">Reading and copying are free — you only pay for deadline tracking &amp; escalation help.</span>`;
+  const dlRow=a.paid
+    ? `${a.free_first?'<div class="flag" style="margin-bottom:12px;"><b>Your first appeal is on us — download it free.</b></div>':''}<button onclick="downloadAppeal(${a.id})">⬇ Download my appeal (PDF)</button> <button class="ghost" style="margin-left:8px;" onclick="submitAppeal(${a.id})">I\'ve sent it — mark submitted</button>`
+    : `<button onclick="payThenDownload(${a.id})">Get my finished PDF — $10</button> <div class="muted" style="font-size:13px;margin-top:8px;">You've seen the whole letter above — you only pay to download the ready-to-sign, ready-to-mail file with your details filled in.</div>`;
   box.innerHTML=`
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h2 style="margin:0;">Your appeal is ready</h2><span class="badge">You sign &amp; send</span></div>
@@ -162,17 +186,34 @@ function renderAppeal(a,sponsored){
       ${code}
     </div>
     <div class="card">
-      <h3 style="margin-top:0;">Your appeal letter</h3>
-      <p class="muted" style="margin-top:-4px;">Read it over and edit anything. Replace anything in <b>[brackets]</b> with your details, then sign and send it to your insurer.</p>
+      <h3 style="margin-top:0;">Your appeal letter <span class="badge ok" style="vertical-align:middle;">details filled in</span></h3>
+      <p class="muted" style="margin-top:-2px;">Preview it below and edit anything you like. When you're happy, download the finished PDF — sign it and mail or upload it to your insurer.</p>
       <div class="letter" id="letterBox" contenteditable="true">${OT.esc(a.letter)}</div>
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
         <button class="ghost small" onclick="saveLetter(${a.id})">Save edits</button>
-        <button class="ghost small" onclick="copyLetter()">Copy text</button>
       </div>
-      <div style="margin-top:18px;">${payRow}</div>
+      <div style="margin-top:18px;">${dlRow}</div>
       <div id="afterSubmit_${a.id}"></div>
     </div>`;
-  goStep(4);
+  goStep(5);
+}
+async function downloadAppeal(id){
+  const box=document.getElementById('letterBox');
+  try{ if(box){ await OT.api('/appeals/'+id,{method:'PUT',body:{letter:box.innerText}}); } }catch(e){}
+  try{
+    const r=await fetch('/api/appeals/'+id+'/download',{headers:{authorization:'Bearer '+OT.token()}});
+    if(r.status===402){ return payThenDownload(id); }
+    if(!r.ok){ OT.toast('Could not download — please try again'); return; }
+    const blob=await r.blob(); const url=URL.createObjectURL(blob);
+    const el=document.createElement('a'); el.href=url; el.download='Overturn-appeal-'+id+'.pdf'; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(url);
+    OT.toast('Downloaded');
+  }catch(e){ OT.toast(e.message); }
+}
+async function payThenDownload(id){
+  const r=await OT.api('/billing/pay-appeal/'+id,{method:'POST'});
+  if(r.clientSecret){ const ok=await stripePay(r.clientSecret); if(!ok){ alert('Payment not completed.'); return; }
+    for(let i=0;i<6;i++){ const {appeal}=await OT.api('/appeals/'+id); if(appeal.paid) break; await new Promise(s=>setTimeout(s,800)); } }
+  await downloadAppeal(id); loadAppeals();
 }
 async function saveLetter(id){ await OT.api('/appeals/'+id,{method:'PUT',body:{letter:document.getElementById('letterBox').innerText}}); }
 async function payAppeal(id){
@@ -215,9 +256,10 @@ async function parseDenial(){
   const dataUrl=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});
   try{ const {extracted}=await OT.api('/appeals/parse',{method:'POST',body:{file:dataUrl}});
     if(!extracted){ msg.textContent='Automatic reading needs AI enabled — please fill the form manually.'; return; }
-    const set=(id,val)=>{ if(val) document.getElementById(id).value=val; };
+    const set=(id,val)=>{ const el=document.getElementById(id); if(val && el) el.value=val; };
     set('insurer',extracted.insurer); set('plan',extracted.plan); set('reason',extracted.reason);
     set('service',extracted.service); set('drug',extracted.drug); set('notes',extracted.notes);
+    set('name',extracted.name); set('memberId',extracted.memberId); set('claimNumber',extracted.claimNumber);
     msg.textContent='Filled from your letter — please review and adjust before generating.';
   }catch(e){ msg.textContent=e.message; }
 }
@@ -240,7 +282,7 @@ document.getElementById('billBtn').addEventListener('click', async ()=>{
   document.getElementById('billErr').classList.add('hide');
   const lineItems=v('lineItems').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split(',');return {code:(p[0]||'').trim(),desc:(p[1]||'').trim(),amount:parseFloat(p[2])||0,units:parseInt(p[3])||1};});
   if(!lineItems.length){ err('billErr','Add at least one line item.'); return; }
-  try{ const {bill}=await OT.api('/bills',{method:'POST',body:{providerName:v('billProvider'),lineItems}}); renderBill(bill); loadBills(); }
+  try{ const {bill}=await OT.api('/bills',{method:'POST',body:{providerName:v('billProvider'),patientName:v('patientName'),accountNumber:v('accountNumber'),lineItems}}); renderBill(bill); loadBills(); }
   catch(e){ err('billErr',e.message); }
 });
 function renderBill(b){
@@ -256,7 +298,7 @@ function renderBill(b){
       <h3 style="margin-top:0;">Your dispute letter</h3>
       <p class="muted" style="margin-top:-4px;">Replace anything in <b>[brackets]</b>, then send it to the provider's billing department.</p>
       <div class="letter" id="disputeBox" contenteditable="true">${OT.esc(b.dispute_letter)}</div>
-      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;"><button class="ghost small" onclick="copyDispute()">Copy text</button></div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;"><button class="small" onclick="downloadBill(${b.id})">⬇ Download dispute (PDF)</button><button class="ghost small" onclick="copyDispute()">Copy text</button></div>
       <div class="flag" style="margin-top:16px;">When the provider adjusts the bill, come back and record what you saved. Our fee is ${Math.round(b.contingency_rate*100)}% of realized savings — charged only then, nothing up front.</div>
       <button class="small" style="margin-top:12px;" onclick="recordSaving(${b.id})">Record realized savings</button><div id="saved_${b.id}"></div>
     </div>`;

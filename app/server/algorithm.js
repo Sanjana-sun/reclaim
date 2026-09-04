@@ -199,10 +199,30 @@ async function parseDenial(dataUrl) {
   const out = await callVision({
     mediaType: m[1], base64: m[2],
     system: 'You extract structured fields from a US health-insurance denial letter. Output ONLY JSON.',
-    prompt: `Return JSON with keys: insurer (string), plan (one of commercial|aca|ma|erisa or ""), reason (one of ${verticals.validReasons('health').join('|')} or ""), service (string), drug (string), notes (short summary string). Use "" if unknown.`,
+    prompt: `Return JSON with keys: insurer (string), plan (one of commercial|aca|ma|erisa or ""), reason (one of ${verticals.validReasons('health').join('|')} or ""), service (string), drug (string), notes (short summary string), memberId (string), claimNumber (string), name (patient name string). Use "" if unknown.`,
   });
   if (!out) return null;
   try { const j = out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1); return JSON.parse(j); } catch (e) { return null; }
+}
+
+// Merge the user's personal details into a drafted letter so no [brackets] remain.
+function fillDetails(text, d = {}) {
+  let out = text || '';
+  const map = {
+    '[Your name]': d.name, '[Your signature]': d.name,
+    '[Member ID]': d.memberId, '[ID]': d.memberId,
+    '[claim number]': d.claimNumber, '[claim #]': d.claimNumber,
+    '[Phone]': d.phone, '[Email]': d.email,
+    '[Your address]': d.address, '[account number]': d.accountNumber,
+    '[Provider]': d.provider,
+  };
+  for (const [token, val] of Object.entries(map)) { if (val) out = out.split(token).join(String(val)); }
+  // Prepend a sender block (name / address / contact) so the letter reads like a real one.
+  if (d.name || d.address) {
+    const header = [d.name, d.address, [d.phone, d.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
+    out = header + '\n\n' + out;
+  }
+  return out;
 }
 
 function externalReviewLetter(appeal) {
@@ -245,4 +265,4 @@ async function winStats() {
   return { overall, total: rows.length, byInsurer: by((r) => r.insurer), byReason: by((r) => r.reason) };
 }
 
-module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, parseDenial, externalReviewLetter, PROMPT_VERSION };
+module.exports = { classify, draftAppeal, lint, detectBillErrors, draftDisputeLetter, recordOutcome, winStats, parseDenial, externalReviewLetter, fillDetails, PROMPT_VERSION };
