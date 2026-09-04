@@ -88,20 +88,39 @@
   </section>
 
   <section id="sec_bills" class="hide">
-    <div class="card">
-      <h2 style="margin-top:0;">Dispute a medical bill</h2>
-      <label>Provider / hospital</label><input id="billProvider" placeholder="City General Hospital">
-      <label>Itemized line items <span class="muted">— one per line: code, description, amount, units</span></label>
-      <textarea id="lineItems" style="min-height:130px;" placeholder="99285, ER visit level 5, 2200, 1
+    <div class="wiz-steps" id="billSteps">
+      <div class="wiz-chip active" data-bstep="1"><span class="n">1</span><span class="lbl">Your bill</span></div>
+      <div class="wiz-chip" data-bstep="2"><span class="n">2</span><span class="lbl">The charges</span></div>
+      <div class="wiz-chip" data-bstep="3"><span class="n">3</span><span class="lbl">Review &amp; dispute</span></div>
+    </div>
+
+    <div class="card wiz-step" id="bstep1">
+      <h2>Which bill are we fighting?</h2>
+      <p class="muted-intro">Start with who sent it. Tip: if you only got a summary, ask the provider for an <b>itemized bill</b> — that's where the errors hide.</p>
+      <label>Provider or hospital</label><input id="billProvider" placeholder="City General Hospital">
+      <div class="wiz-nav"><span></span><button onclick="goBStep(2)">Continue →</button></div>
+    </div>
+
+    <div class="card wiz-step hide" id="bstep2">
+      <h2>Add the charges</h2>
+      <p class="muted-intro">Copy the line items from your itemized bill — one per line, as <code>code, description, amount, units</code>.</p>
+      <label>Itemized line items</label>
+      <textarea id="lineItems" style="min-height:150px;" placeholder="99285, ER visit level 5, 2200, 1
 73721, MRI knee, 1800, 1
 73721, MRI knee, 1800, 1
 80053, Metabolic panel, 210, 1"></textarea>
-      <div class="disc">You only pay a percentage of what we actually save you — and only after savings are realized.</div>
-      <button id="billBtn">Analyze bill</button>
+      <div class="disc">You only pay a percentage of what we actually save you — and only after the savings are real.</div>
       <div id="billErr" class="err hide"></div>
+      <div class="wiz-nav"><button class="ghost" onclick="goBStep(1)">← Back</button><button id="billBtn">Analyze my bill →</button></div>
     </div>
-    <div id="billResult" class="card hide"></div>
-    <h2>My bill disputes</h2><div id="billList" class="card"><p class="muted">Loading…</p></div>
+
+    <div class="wiz-step hide" id="bstep3"><div id="billReview"></div></div>
+
+    <div style="margin-top:26px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <h2 style="margin:0;">My bill disputes</h2>
+      <button class="small ghost" onclick="resetBillWizard()">+ Start a new dispute</button>
+    </div>
+    <div id="billList" class="card" style="margin-top:12px;"><p class="muted">Loading…</p></div>
   </section>
 </div>
 <script src="js/api.js"></script>
@@ -111,6 +130,9 @@ function tab(t){ ['appeals','bills'].forEach(x=>{ document.getElementById('sec_'
 function goStep(n){ [1,2,3,4].forEach(s=>document.getElementById('step'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#wizSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.step; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
 function resetWizard(){ ['insurer','service','drug','notes','denialCode','providerCode'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';}); const f=document.getElementById('denialFile'); if(f) f.value=''; document.getElementById('parseMsg').textContent=''; document.getElementById('wizReview').innerHTML=''; goStep(1); }
 function copyLetter(){ const t=document.getElementById('letterBox'); if(t){ navigator.clipboard.writeText(t.innerText).then(()=>OT.toast('Letter copied')); } }
+function goBStep(n){ [1,2,3].forEach(s=>document.getElementById('bstep'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#billSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.bstep; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
+function resetBillWizard(){ const p=document.getElementById('billProvider'); if(p)p.value=''; const l=document.getElementById('lineItems'); if(l)l.value=''; document.getElementById('billErr').classList.add('hide'); document.getElementById('billReview').innerHTML=''; goBStep(1); }
+function copyDispute(){ const t=document.getElementById('disputeBox'); if(t){ navigator.clipboard.writeText(t.innerText).then(()=>OT.toast('Dispute letter copied')); } }
 const err=(id,e)=>{const el=document.getElementById(id);el.textContent=e;el.classList.remove('hide');};
 
 document.getElementById('genBtn').addEventListener('click', async ()=>{
@@ -222,15 +244,23 @@ document.getElementById('billBtn').addEventListener('click', async ()=>{
   catch(e){ err('billErr',e.message); }
 });
 function renderBill(b){
-  const box=document.getElementById('billResult'); box.classList.remove('hide');
+  const box=document.getElementById('billReview');
   const f=b.findings.map(x=>`<tr><td>${x.line}</td><td>${OT.esc(x.code)}</td><td><span class="badge warn">${x.type.replace(/_/g,' ')}</span></td><td>${OT.esc(x.desc)}</td><td>${OT.money(x.saving)}</td></tr>`).join('');
-  box.innerHTML=`<h2 style="margin-top:0;">Bill analysis</h2>
-    <div class="row3"><div class="stat"><b>${OT.money(b.total_amount)}</b><span>total billed</span></div><div class="stat"><b>${b.findings.length}</b><span>issues found</span></div><div class="stat"><b>${OT.money(b.estimated_savings)}</b><span>potential savings</span></div></div>
-    ${b.findings.length?`<table style="margin-top:14px;"><tr><th>Line</th><th>Code</th><th>Issue</th><th>Detail</th><th>Est. adj.</th></tr>${f}</table>`:'<p class="muted">No automated findings — you can still send the dispute for a manual review.</p>'}
-    <h3>Draft dispute letter</h3><div class="letter">${OT.esc(b.dispute_letter)}</div>
-    <div class="flag">When the provider adjusts the bill, record what you saved. Our fee is ${Math.round(b.contingency_rate*100)}% of realized savings — charged only then.</div>
-    <button class="small" onclick="recordSaving(${b.id})">Record realized savings</button><div id="saved_${b.id}"></div>`;
-  window.scrollTo({top:0,behavior:'smooth'});
+  box.innerHTML=`
+    <div class="card">
+      <h2 style="margin-top:0;">What we found</h2>
+      <div class="row3"><div class="stat"><b>${OT.money(b.total_amount)}</b><span>total billed</span></div><div class="stat"><b>${b.findings.length}</b><span>issues found</span></div><div class="stat"><b>${OT.money(b.estimated_savings)}</b><span>potential savings</span></div></div>
+      ${b.findings.length?`<table style="margin-top:16px;"><tr><th>Line</th><th>Code</th><th>Issue</th><th>Detail</th><th>Est. adj.</th></tr>${f}</table>`:'<p class="muted" style="margin-top:14px;">No automated findings — you can still send the dispute for a manual review.</p>'}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Your dispute letter</h3>
+      <p class="muted" style="margin-top:-4px;">Replace anything in <b>[brackets]</b>, then send it to the provider's billing department.</p>
+      <div class="letter" id="disputeBox" contenteditable="true">${OT.esc(b.dispute_letter)}</div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;"><button class="ghost small" onclick="copyDispute()">Copy text</button></div>
+      <div class="flag" style="margin-top:16px;">When the provider adjusts the bill, come back and record what you saved. Our fee is ${Math.round(b.contingency_rate*100)}% of realized savings — charged only then, nothing up front.</div>
+      <button class="small" style="margin-top:12px;" onclick="recordSaving(${b.id})">Record realized savings</button><div id="saved_${b.id}"></div>
+    </div>`;
+  goBStep(3);
 }
 async function recordSaving(id){ const amt=Number(prompt('How much did the provider actually reduce the bill? ($)','0'))||0; const {fee}=await OT.api('/bills/'+id+'/outcome',{method:'POST',body:{amountSaved:amt}}); document.getElementById('saved_'+id).innerHTML=`<div class="flag">Saved ${OT.money(amt)}. Our fee: ${OT.money(fee)}.</div>`; loadBills(); }
 async function loadBills(){ const {bills}=await OT.api('/bills'); const el=document.getElementById('billList');
