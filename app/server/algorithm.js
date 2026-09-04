@@ -209,7 +209,7 @@ async function parseDenial(dataUrl) {
 function fillDetails(text, d = {}) {
   let out = text || '';
   const map = {
-    '[Your name]': d.name, '[Your signature]': d.name,
+    '[Your name]': d.name,
     '[Member ID]': d.memberId, '[ID]': d.memberId,
     '[claim number]': d.claimNumber, '[claim #]': d.claimNumber,
     '[Phone]': d.phone, '[Email]': d.email,
@@ -217,6 +217,8 @@ function fillDetails(text, d = {}) {
     '[Provider]': d.provider,
   };
   for (const [token, val] of Object.entries(map)) { if (val) out = out.split(token).join(String(val)); }
+  // Turn the signature placeholder into a blank line to sign above the typed name.
+  out = out.split('[Your signature]').join('\n_______________________________');
   // Prepend a sender block (name / address / contact) so the letter reads like a real one.
   if (d.name || d.address) {
     const header = [d.name, d.address, [d.phone, d.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
