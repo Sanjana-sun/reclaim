@@ -4,14 +4,14 @@ const { insert, findOne, update, find } = require('../db');
 const { requireAuth } = require('../auth');
 const payments = require('../payments');
 
-router.get('/config', (req, res) => res.json({ stripeEnabled: payments.enabled(), publishableKey: payments.publishableKey(), appealPrice: Number(process.env.APPEAL_PRICE) || 40 }));
+router.get('/config', (req, res) => res.json({ stripeEnabled: payments.enabled(), publishableKey: payments.publishableKey(), appealPrice: Number(process.env.APPEAL_PRICE) || 10 }));
 
 router.post('/pay-appeal/:id', requireAuth(['consumer']), async (req, res, next) => {
   try {
     const a = await findOne('appeals', (x) => x.id === +req.params.id && x.user_id === req.user.id);
     if (!a) return res.status(404).json({ error: 'Not found' });
     if (a.paid) return res.json({ appeal: a, alreadyPaid: true });
-    const price = Number(process.env.APPEAL_PRICE) || 40;
+    const price = Number(process.env.APPEAL_PRICE) || 10;
     const charge = await payments.createCharge({ amountUsd: price, description: 'Overturn appeal ' + a.id, metadata: { appeal_id: a.id, user_id: req.user.id } });
     await insert('payments', { user_id: req.user.id, engine: 'consumer', amount: price, status: charge.status, provider: charge.provider, ref_type: 'appeal', ref_id: a.id, provider_ref: charge.id || null });
     // Stub (no Stripe key) succeeds immediately. With Stripe, the client confirms the

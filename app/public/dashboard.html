@@ -1,5 +1,25 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Overturn — my dashboard</title><link rel="stylesheet" href="css/app.css"></head><body>
+<title>Overturn — my dashboard</title><link rel="stylesheet" href="css/app.css">
+<style>
+.wiz-steps{display:flex;gap:8px;margin:6px 0 22px;flex-wrap:wrap;}
+.wiz-chip{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:500;color:var(--mut);padding:8px 15px;border:1px solid var(--line);border-radius:100px;background:var(--surface);}
+.wiz-chip .n{width:22px;height:22px;border-radius:50%;background:var(--surface-2);color:var(--mut);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;}
+.wiz-chip.active{border-color:var(--brand);color:var(--brand-700);background:var(--brand-tint);}
+.wiz-chip.active .n{background:var(--brand);color:#fff;}
+.wiz-chip.done{color:var(--ok);}
+.wiz-chip.done .n{background:var(--ok);color:#fff;}
+.wiz-nav{display:flex;justify-content:space-between;gap:10px;margin-top:24px;}
+.wiz-step h2{margin-top:0;}
+.wiz-step .muted-intro{color:var(--mut);margin:-4px 0 18px;}
+.law-card{border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:0 10px 10px 0;padding:14px 16px;margin:10px 0;background:var(--surface);}
+.law-card h4{margin:0 0 5px;font-size:15px;}
+.law-card p{margin:0;font-size:14px;color:var(--ink-2);}
+.law-card .src{font-size:12px;color:var(--faint);margin-top:8px;}
+.check{list-style:none;padding:0;margin:8px 0 0;}
+.check li{position:relative;padding:7px 0 7px 28px;font-size:14px;color:var(--ink-2);}
+.check li::before{content:'';position:absolute;left:0;top:9px;width:16px;height:16px;border-radius:4px;border:1.5px solid var(--brand);}
+@media(max-width:640px){.wiz-chip .lbl{display:none;}}
+</style></head><body>
 <div id="nav"></div>
 <div class="wrap">
   <div class="tabs"><button id="t_appeals" class="active" onclick="tab('appeals')">Appeal a denial</button><button id="t_bills" onclick="tab('bills')">Dispute a bill</button></div>
@@ -9,29 +29,62 @@
       <div><b>Go unlimited with Plus</b><div class="muted" style="font-size:14px;">Unlimited appeals, the bill analyzer, and priority deadline alerts — $12/mo.</div></div>
       <button class="small" onclick="upgrade()">Upgrade to Plus</button>
     </div>
-    <div class="card">
-      <h2 style="margin-top:0;">New appeal</h2>
-      <label>Upload your denial letter <span class="muted">(optional — auto-fills the form)</span></label>
+
+    <div class="wiz-steps" id="wizSteps">
+      <div class="wiz-chip active" data-step="1"><span class="n">1</span><span class="lbl">Start</span></div>
+      <div class="wiz-chip" data-step="2"><span class="n">2</span><span class="lbl">The denial</span></div>
+      <div class="wiz-chip" data-step="3"><span class="n">3</span><span class="lbl">Your care</span></div>
+      <div class="wiz-chip" data-step="4"><span class="n">4</span><span class="lbl">Review &amp; send</span></div>
+    </div>
+
+    <div class="card wiz-step" id="step1">
+      <h2>Let's start your appeal</h2>
+      <p class="muted-intro">Have your denial letter handy? Upload it and we'll read the details for you. No letter? Just skip ahead — we'll ask a few simple questions.</p>
+      <label>Upload denial letter <span class="muted">(PDF or photo — optional)</span></label>
       <input type="file" id="denialFile" accept="image/*,application/pdf">
-      <button class="small ghost" style="margin-top:8px;" onclick="parseDenial()">Auto-fill from letter</button>
-      <div id="parseMsg" class="muted" style="margin-top:6px;font-size:13px;"></div>
-      <hr style="border:none;border-top:1px solid var(--line);margin:18px 0;">
+      <button class="small ghost" style="margin-top:10px;" onclick="parseDenial()">Read my letter</button>
+      <div id="parseMsg" class="muted" style="margin-top:8px;font-size:13px;"></div>
+      <div class="wiz-nav"><span></span><button onclick="goStep(2)">Continue →</button></div>
+    </div>
+
+    <div class="card wiz-step hide" id="step2">
+      <h2>About the denial</h2>
+      <p class="muted-intro">Who denied it, and why? This tells us the exact rules and deadline that apply to you.</p>
       <div class="row">
         <div><label>Insurer</label><input id="insurer" placeholder="UnitedHealthcare"></div>
         <div><label>Plan type</label><select id="plan"><option value="commercial">Commercial / employer</option><option value="aca">ACA marketplace</option><option value="ma">Medicare Advantage</option><option value="erisa">Self-funded (ERISA)</option></select></div>
       </div>
-      <label>Denial reason</label>
-      <select id="reason"><option value="medical_necessity">Not medically necessary</option><option value="prior_auth">No prior authorization</option><option value="experimental">Experimental / investigational</option><option value="out_of_network">Out of network</option><option value="not_covered">Not a covered benefit</option><option value="step_therapy">Step therapy required</option><option value="coding">Coding / billing error</option></select>
-      <div class="row"><div><label>Service / treatment</label><input id="service" placeholder="MRI of left knee"></div><div><label>Medication (if any)</label><input id="drug" placeholder="Ozempic"></div></div>
-      <div class="row"><div><label>Your state <span class="muted">(applies your state's rights)</span></label><select id="state"><option value="">Select…</option></select></div><div><label>Denial code <span class="muted">(optional, from your EOB)</span></label><input id="denialCode" placeholder="e.g. 50 or CO-197"></div></div>
-      <label>Your situation (in your words)</label><textarea id="notes" placeholder="My doctor says I need this because…"></textarea>
-      <label>Clinic code <span class="muted">(optional)</span></label><input id="providerCode" placeholder="e.g. PROVIDER">
-      <div class="disc">Self-help tool — not a law firm or medical provider. You sign and submit. No outcome guarantee.</div>
-      <button id="genBtn">Generate appeal draft</button>
-      <div id="genErr" class="err hide"></div>
+      <div class="row">
+        <div><label>Your state <span class="muted">(applies your state's rights)</span></label><select id="state"><option value="">Select…</option></select></div>
+        <div><label>Denial code <span class="muted">(optional, from your EOB)</span></label><input id="denialCode" placeholder="e.g. 50 or CO-197"></div>
+      </div>
+      <label>Why did they say they denied it?</label>
+      <select id="reason"><option value="medical_necessity">Not medically necessary</option><option value="prior_auth">No prior authorization</option><option value="experimental">Experimental / investigational</option><option value="out_of_network">Out of network</option><option value="not_covered">Not a covered benefit</option><option value="step_therapy">Step therapy required first</option><option value="coding">Coding / billing error</option></select>
+      <div class="wiz-nav"><button class="ghost" onclick="goStep(1)">← Back</button><button onclick="goStep(3)">Continue →</button></div>
     </div>
-    <div id="appealResult" class="card hide"></div>
-    <h2>My appeals</h2><div id="appealList" class="card"><p class="muted">Loading…</p></div>
+
+    <div class="card wiz-step hide" id="step3">
+      <h2>Your care</h2>
+      <p class="muted-intro">What was denied, and why you need it. A sentence in your own words helps a lot.</p>
+      <div class="row">
+        <div><label>Service or treatment</label><input id="service" placeholder="MRI of left knee"></div>
+        <div><label>Medication <span class="muted">(if any)</span></label><input id="drug" placeholder="Ozempic"></div>
+      </div>
+      <label>Your situation <span class="muted">(in your own words)</span></label>
+      <textarea id="notes" placeholder="My doctor says I need this because…"></textarea>
+      <label>Clinic code <span class="muted">(optional)</span></label><input id="providerCode" placeholder="e.g. PROVIDER">
+      <div class="disc">Self-help tool — not a law firm or medical provider. You review, sign, and send it yourself. No outcome guarantee.</div>
+      <div id="genErr" class="err hide"></div>
+      <div class="wiz-nav"><button class="ghost" onclick="goStep(2)">← Back</button><button id="genBtn">Create my appeal →</button></div>
+    </div>
+
+    <div class="wiz-step hide" id="step4"><div id="wizReview"></div></div>
+
+    <div style="margin-top:26px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <h2 style="margin:0;">My appeals</h2>
+      <button class="small ghost" onclick="resetWizard()">+ Start a new appeal</button>
+    </div>
+    <div id="appealList" class="card" style="margin-top:12px;"><p class="muted">Loading…</p></div>
   </section>
 
   <section id="sec_bills" class="hide">
@@ -55,6 +108,9 @@
 <script>
 const u = OT.guard(['consumer']); if(u) document.getElementById('nav').innerHTML = navBar(u);
 function tab(t){ ['appeals','bills'].forEach(x=>{ document.getElementById('sec_'+x).classList.toggle('hide',x!==t); document.getElementById('t_'+x).classList.toggle('active',x===t); }); }
+function goStep(n){ [1,2,3,4].forEach(s=>document.getElementById('step'+s).classList.toggle('hide',s!==n)); document.querySelectorAll('#wizSteps .wiz-chip').forEach(c=>{ const s=+c.dataset.step; c.classList.toggle('active',s===n); c.classList.toggle('done',s<n); }); window.scrollTo({top:0,behavior:'smooth'}); }
+function resetWizard(){ ['insurer','service','drug','notes','denialCode','providerCode'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';}); const f=document.getElementById('denialFile'); if(f) f.value=''; document.getElementById('parseMsg').textContent=''; document.getElementById('wizReview').innerHTML=''; goStep(1); }
+function copyLetter(){ const t=document.getElementById('letterBox'); if(t){ navigator.clipboard.writeText(t.innerText).then(()=>OT.toast('Letter copied')); } }
 const err=(id,e)=>{const el=document.getElementById(id);el.textContent=e;el.classList.remove('hide');};
 
 document.getElementById('genBtn').addEventListener('click', async ()=>{
@@ -64,24 +120,37 @@ document.getElementById('genBtn').addEventListener('click', async ()=>{
   catch(e){ err('genErr',e.message); }
 });
 function renderAppeal(a,sponsored){
-  const box=document.getElementById('appealResult'); box.classList.remove('hide');
-  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">Your appeal draft</h2><span class="badge">AI-drafted</span></div>
-    <div class="flag"><b>Deadline:</b> ${OT.esc(a.deadline_text)} (by ${new Date(a.deadline).toLocaleDateString()})</div>
-    ${a.needs_medical_necessity?'<div class="flag warn"><b>Attach your doctor\'s letter.</b> This appeal relies on your treating physician\'s statement of medical necessity — Overturn organizes it but does not make the medical judgment.</div>':''}
-    ${a.review_status==='pending'?'<div class="flag">In our clinical-review queue for a quality check on the medical-necessity framing.</div>':''}
-    ${a.review_status==='approved'?'<div class="flag"><b>Clinician-reviewed.</b> A licensed reviewer confirmed the medical-necessity framing'+(a.reviewer_note?': '+OT.esc(a.reviewer_note):'.')+'</div>':''}
-    ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\'s free to you.</div>':''}
-    ${(a.rights&&a.rights.length)?`<div style="margin:14px 0;"><b>Rights cited in your appeal</b><ul style="margin:8px 0 0;padding-left:18px;">${a.rights.map(r=>`<li style="margin:4px 0;"><b>${OT.esc(r.title)}</b> <span class="muted">— ${OT.esc(r.citation)}</span></li>`).join('')}</ul></div>`:''}
-    ${(a.evidence&&a.evidence.length)?`<div class="flag"><b>Evidence to gather &amp; attach:</b><ul style="margin:8px 0 0;padding-left:18px;">${a.evidence.map(e=>`<li style="margin:3px 0;">${OT.esc(e)}</li>`).join('')}</ul></div>`:''}
-    ${a.code_guidance?`<div class="flag warn"><b>Denial code:</b> ${OT.esc(a.code_guidance.note)}</div>`:''}
-    <div class="disc">Rights shown are general information, not legal advice, and may vary by plan/state — verify before relying on them.</div>
-    <div class="letter" id="letterBox" contenteditable="true">${OT.esc(a.letter)}</div>
-    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-      <button class="small" onclick="saveLetter(${a.id})">Save edits</button>
-      ${a.paid?`<button class="small" onclick="submitAppeal(${a.id})">Mark as submitted</button>`:`<button class="small" onclick="payAppeal(${a.id})">Pay $40 to finalize</button>`}
+  const box=document.getElementById('wizReview');
+  const rights=(a.rights&&a.rights.length)?`<h3 style="margin:22px 0 4px;">Your rights, in plain English</h3><p class="muted" style="margin:0 0 8px;">These are the protections your letter leans on.</p>${a.rights.map(r=>`<div class="law-card"><h4>${OT.esc(r.title)}</h4><p>${OT.esc(r.summary||'')}</p><div class="src">Source: ${OT.esc(r.citation)}</div></div>`).join('')}<div class="disc" style="margin-top:12px;">General information, not legal advice — rights vary by plan and state. Verify before relying on them.</div>`:'';
+  const evid=(a.evidence&&a.evidence.length)?`<h3 style="margin:22px 0 4px;">What to gather &amp; attach</h3><ul class="check">${a.evidence.map(e=>`<li>${OT.esc(e)}</li>`).join('')}</ul>`:'';
+  const code=a.code_guidance?`<div class="flag warn" style="margin-top:14px;"><b>Your denial code:</b> ${OT.esc(a.code_guidance.note)}</div>`:'';
+  const payRow=a.paid
+    ? `${a.free_first?'<div class="flag" style="margin-bottom:12px;"><b>Your first appeal is on us.</b> No payment needed — send it, then mark it submitted below.</div>':''}<button onclick="submitAppeal(${a.id})">I\'ve sent it — mark as submitted</button>`
+    : `<button onclick="payAppeal(${a.id})">Finalize &amp; track for $10</button> <span class="muted" style="font-size:13px;margin-left:6px;">Reading and copying are free — you only pay for deadline tracking &amp; escalation help.</span>`;
+  box.innerHTML=`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h2 style="margin:0;">Your appeal is ready</h2><span class="badge">You sign &amp; send</span></div>
+      <div class="flag" style="margin-top:14px;"><b>Deadline:</b> ${OT.esc(a.deadline_text)} <span class="muted">(by ${new Date(a.deadline).toLocaleDateString()})</span></div>
+      ${a.needs_medical_necessity?'<div class="flag warn"><b>One thing to add:</b> ask your doctor for a short letter of medical necessity to attach. We organize it — your doctor makes the medical call.</div>':''}
+      ${a.review_status==='pending'?'<div class="flag">A licensed reviewer is double-checking the medical-necessity wording.</div>':''}
+      ${a.review_status==='approved'?'<div class="flag"><b>Clinician-reviewed.</b> A licensed reviewer confirmed the framing'+(a.reviewer_note?': '+OT.esc(a.reviewer_note):'.')+'</div>':''}
+      ${sponsored?'<div class="flag"><b>Good news:</b> a manufacturer program covers this appeal — it\'s free to you.</div>':''}
+      ${rights}
+      ${evid}
+      ${code}
     </div>
-    <div id="afterSubmit_${a.id}"></div>`;
-  window.scrollTo({top:0,behavior:'smooth'});
+    <div class="card">
+      <h3 style="margin-top:0;">Your appeal letter</h3>
+      <p class="muted" style="margin-top:-4px;">Read it over and edit anything. Replace anything in <b>[brackets]</b> with your details, then sign and send it to your insurer.</p>
+      <div class="letter" id="letterBox" contenteditable="true">${OT.esc(a.letter)}</div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button class="ghost small" onclick="saveLetter(${a.id})">Save edits</button>
+        <button class="ghost small" onclick="copyLetter()">Copy text</button>
+      </div>
+      <div style="margin-top:18px;">${payRow}</div>
+      <div id="afterSubmit_${a.id}"></div>
+    </div>`;
+  goStep(4);
 }
 async function saveLetter(id){ await OT.api('/appeals/'+id,{method:'PUT',body:{letter:document.getElementById('letterBox').innerText}}); }
 async function payAppeal(id){

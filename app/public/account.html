@@ -62,7 +62,7 @@ async function load(){
     act.innerHTML='<button class="small ghost" onclick="cancelSub()">Cancel subscription</button>';
   }else{
     badge.textContent='Free'; badge.className='badge gray';
-    text.textContent='You\'re on pay-as-you-go ($40/appeal). Upgrade to Plus for unlimited appeals and the bill analyzer at $12/mo.';
+    text.textContent='You\'re on pay-as-you-go — first appeal free, then $10 each. Upgrade to Plus for unlimited appeals and the bill analyzer at $12/mo.';
     act.innerHTML='<button class="small" onclick="upgrade()">Upgrade to Plus</button>';
   }
   const p=document.getElementById('payments');

@@ -30,16 +30,21 @@ router.post('/', requireAuth(['consumer']), async (req, res, next) => {
     let provider_org_id = null;
     if (providerCode) { const org = await findOne('orgs', (o) => o.type === 'provider' && o.code.toLowerCase() === String(providerCode).toLowerCase()); if (org) provider_org_id = org.id; }
 
+    // Everyone's first appeal is free; sponsored appeals are always free to the patient.
+    const priorAppeals = (await find('appeals', (a) => a.user_id === req.user.id)).length;
+    const firstFree = priorAppeals === 0;
+
     const deadline = new Date(Date.now() + cls.deadlineDays * 86400000).toISOString();
     const appeal = await insert('appeals', {
       user_id: req.user.id, vertical: cls.vertical, insurer, plan_type: cls.planType, reason: cls.reason, service, drug: drug || null,
       state: state || null, denial_code: denialCode || null, notes: notes || null, letter, status: 'draft',
       deadline, deadline_text: cls.deadlineText, rights: rights || [], evidence: evidence || [], code_guidance: codeGuidance || null,
       needs_medical_necessity: needsMedicalNecessity, sponsor_org_id: sponsor ? sponsor.org_id : null,
-      sponsor_rate: sponsor ? sponsor.rate : null, provider_org_id, amount_recovered: 0, paid: !!sponsor,
+      sponsor_rate: sponsor ? sponsor.rate : null, provider_org_id, amount_recovered: 0,
+      paid: !!sponsor || firstFree, free_first: firstFree,
       review_status: needsMedicalNecessity ? 'pending' : 'not_required', reviewer_note: null,
     });
-    res.json({ appeal, sponsored: !!sponsor });
+    res.json({ appeal, sponsored: !!sponsor, firstFree });
   } catch (e) { next(e); }
 });
 
