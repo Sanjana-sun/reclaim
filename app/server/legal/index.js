@@ -15,10 +15,16 @@ function retrieve({ reason, planType, state, denialCode, service, notes } = {}) 
   // State rights apply to fully-insured plans (not self-funded/ERISA). An entry may carry its
   // own `applies()` predicate; entries without one are treated as universally applicable.
   const inState = (planType !== 'erisa' && state && STATES[state]) ? STATES[state] : [];
-  const stateRights = inState.filter((r) => {
+  const applicable = inState.filter((r) => {
     if (typeof r.applies !== 'function') return true;
     try { return r.applies(ctx); } catch (e) { return false; }
   });
+  // A verified state-specific right can supersede a generic one. Massachusetts, for example,
+  // runs external review through the Office of Patient Protection rather than the Division of
+  // Insurance, so citing the generic "through your state DOI" entry alongside it would be both
+  // redundant and wrong.
+  const superseded = new Set(applicable.map((r) => r.supersedes).filter(Boolean));
+  const stateRights = applicable.filter((r) => !superseded.has(r.id));
 
   // Normalize e.g. "CO-197" -> "197", "B7" -> "B7", strip group-code prefixes and separators.
   const key = denialCode ? String(denialCode).toUpperCase().replace(/^(CO|PR|OA|PI|CR)[-\s]?/, '').replace(/[^0-9A-Z]/g, '') : '';

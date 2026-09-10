@@ -5,7 +5,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const BACKEND = process.env.DATABASE_URL ? 'pg' : 'json';
-const COLLECTIONS = ['users', 'orgs', 'appeals', 'bills', 'payments', 'winrate', 'subscriptions'];
+const COLLECTIONS = ['users', 'orgs', 'appeals', 'bills', 'payments', 'winrate', 'subscriptions', 'audit'];
 
 // --------------------------------------------------------------------------
 // JSON backend
@@ -72,7 +72,41 @@ async function init() {
     jLoad();
   }
   if ((await store().count('users')) === 0) await seed();
+  await purgeDemoAccounts();
   return BACKEND;
+}
+
+// The seeded demo logins are documented in the README, so their passwords are public. That is
+// fine on a laptop and unacceptable on a deployment that collects patient names, addresses and
+// member IDs. In production (or with SEED_DEMO=false) they are removed on every boot, so a
+// deploy heals an environment that already has them rather than needing a manual cleanup.
+const DEMO_EMAILS = ['patient@overturn.dev', 'provider@overturn.dev', 'pharma@overturn.dev',
+  'employer@overturn.dev', 'clinician@overturn.dev', 'admin@overturn.dev'];
+
+async function purgeDemoAccounts() {
+  const demoAllowed = process.env.SEED_DEMO !== 'false' && process.env.NODE_ENV !== 'production';
+  if (demoAllowed) return;
+
+  const doomed = await find('users', (u) => DEMO_EMAILS.includes(String(u.email || '').toLowerCase()));
+  if (!doomed.length) return;
+
+  for (const u of doomed) {
+    await remove('appeals', (a) => a.user_id === u.id);
+    await remove('bills', (b) => b.user_id === u.id);
+    await remove('payments', (p) => p.user_id === u.id);
+    await remove('subscriptions', (sub) => sub.user_id === u.id);
+  }
+  await remove('users', (u) => DEMO_EMAILS.includes(String(u.email || '').toLowerCase()));
+  console.warn(`Removed ${doomed.length} seeded demo account(s) with published passwords (NODE_ENV=production or SEED_DEMO=false).`);
+
+  if (!(await findOne('users', (u) => u.role === 'admin'))) {
+    if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+      await insert('users', { email: process.env.ADMIN_EMAIL, password_hash: bcrypt.hashSync(process.env.ADMIN_PASSWORD, 8), role: 'admin', org_id: null, name: 'Admin' });
+      console.warn(`Provisioned admin ${process.env.ADMIN_EMAIL} from environment.`);
+    } else {
+      console.warn('No admin account remains. Set ADMIN_EMAIL and ADMIN_PASSWORD and redeploy to create one.');
+    }
+  }
 }
 
 async function seed() {
@@ -86,6 +120,9 @@ async function seed() {
   }
 
   // Orgs are always seeded — they carry no secrets and provide the signup org codes.
+  // Idempotent: seed() can run again on a later boot (e.g. after the demo purge empties the
+  // user table), and duplicate orgs would mean duplicate signup codes.
+  if (await findOne('orgs', (x) => x.code === 'PHARMA')) return;
   const pharma = await insert('orgs', { name: 'NovoMed Pharma', type: 'pharma', code: 'PHARMA', meta: { sponsored_programs: [{ drug: 'Ozempic', budget: 500000, spent: 0, rate: 75 }, { drug: 'Wegovy', budget: 300000, spent: 0, rate: 75 }] } });
   const provider = await insert('orgs', { name: 'Cascade Orthopedics', type: 'provider', code: 'PROVIDER', meta: { acv: 15000, specialty: 'orthopedics' } });
   const employer = await insert('orgs', { name: 'Acme Corp', type: 'employer', code: 'EMPLOYER', meta: { covered_lives: 4200, pmpm: 0.5 } });
